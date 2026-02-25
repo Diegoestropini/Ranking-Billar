@@ -202,11 +202,51 @@ input:focus {
 }
 
 .rank-top td {
-  background: linear-gradient(90deg, rgba(94, 242, 185, 0.3), transparent);
+  background: linear-gradient(90deg, rgba(78, 255, 160, 0.36), rgba(0, 0, 0, 0.78) 78%);
 }
 
 .rank-dynamic td {
-  background: linear-gradient(90deg, var(--row-color, rgba(74, 224, 255, 0.2)), transparent);
+  background: linear-gradient(90deg, var(--row-color, rgba(45, 150, 90, 0.22)), rgba(0, 0, 0, 0.75) 82%);
+}
+
+.ranking-card .data-table tr:hover td {
+  background: rgba(94, 242, 185, 0.12);
+}
+
+#ranking-body tr.rank-top:nth-child(1) td {
+  background: linear-gradient(90deg, rgba(120, 255, 185, 0.56), rgba(0, 0, 0, 0.8) 80%);
+}
+
+#ranking-body tr.rank-top:nth-child(2) td {
+  background: linear-gradient(90deg, rgba(96, 245, 165, 0.48), rgba(0, 0, 0, 0.8) 80%);
+}
+
+#ranking-body tr.rank-top:nth-child(3) td {
+  background: linear-gradient(90deg, rgba(82, 228, 152, 0.42), rgba(0, 0, 0, 0.8) 80%);
+}
+
+#ranking-body tr.rank-top:nth-child(4) td {
+  background: linear-gradient(90deg, rgba(72, 205, 138, 0.36), rgba(0, 0, 0, 0.8) 80%);
+}
+
+.rank-selected td {
+  box-shadow: inset 0 0 0 1px rgba(94, 242, 185, 0.9);
+}
+
+.player-name-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(74, 224, 255, 0.55);
+  text-underline-offset: 0.13rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.player-name-btn:hover {
+  color: #c5f3ff;
 }
 
 .form-actions {
@@ -345,6 +385,68 @@ input:focus {
   gap: 0.5rem;
 }
 
+.player-detail,
+.name-editor {
+  margin-top: 0.8rem;
+  border: 1px solid rgba(74, 224, 255, 0.24);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(4, 15, 33, 0.6);
+}
+
+.player-detail {
+  border-color: rgba(94, 242, 185, 0.55);
+  background: rgba(2, 10, 2, 0.9);
+}
+
+.player-detail-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  color: #7affc8;
+}
+
+.player-detail-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.player-detail-item {
+  border: 1px solid rgba(94, 242, 185, 0.35);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  background: rgba(0, 0, 0, 0.9);
+  color: #c9ffe7;
+  font-size: 0.9rem;
+}
+
+.name-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.name-editor-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.name-editor-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.name-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.name-editor-row input[disabled] {
+  opacity: 0.75;
+}
+
 .empty {
   color: var(--muted);
   font-style: italic;
@@ -390,6 +492,10 @@ input:focus {
 
   .data-table {
     min-width: 520px;
+  }
+
+  .name-editor-row {
+    grid-template-columns: 1fr;
   }
 
   .topbar {

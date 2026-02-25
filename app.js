@@ -8,6 +8,8 @@ const state = {
     championships: [],
   },
   editingChampionshipId: null,
+  selectedPlayerId: null,
+  nameEditorOpen: false,
 };
 
 const refs = {
@@ -23,7 +25,10 @@ const refs = {
   saveBtn: document.getElementById("save-btn"),
   cancelEditBtn: document.getElementById("cancel-edit-btn"),
   toggleFormBtn: document.getElementById("toggle-form-btn"),
+  toggleNameEditorBtn: document.getElementById("toggle-name-editor-btn"),
   rankingBody: document.getElementById("ranking-body"),
+  playerDetail: document.getElementById("player-detail"),
+  nameEditor: document.getElementById("name-editor"),
   championshipList: document.getElementById("championship-list"),
   toast: document.getElementById("toast"),
 };
@@ -393,10 +398,15 @@ function renderRanking() {
   refs.rankingBody.innerHTML = "";
 
   if (!ranking.length) {
+    state.selectedPlayerId = null;
     const tr = document.createElement("tr");
     tr.innerHTML = '<td colspan="6" class="empty">Sin datos de ranking todavia.</td>';
     refs.rankingBody.appendChild(tr);
     return;
+  }
+
+  if (!ranking.some((entry) => entry.playerId === state.selectedPlayerId)) {
+    state.selectedPlayerId = ranking[0].playerId;
   }
 
   ranking.forEach((entry, idx) => {
@@ -407,20 +417,240 @@ function renderRanking() {
       tr.classList.add("rank-dynamic");
       const dynamicCount = Math.max(1, ranking.length - 4);
       const progress = Math.min(1, Math.max(0, (idx - 4) / (dynamicCount - 1 || 1)));
-      const hue = 190 - 190 * progress;
-      const alpha = 0.2 + progress * 0.17;
-      tr.style.setProperty("--row-color", `hsla(${hue.toFixed(1)}, 96%, 56%, ${alpha.toFixed(3)})`);
+      const lightness = 30 + progress * 18;
+      const alpha = 0.16 + progress * 0.16;
+      tr.style.setProperty("--row-color", `hsla(132, 82%, ${lightness.toFixed(1)}%, ${alpha.toFixed(3)})`);
     }
-    tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${entry.name}</td>
-      <td>${formatNum(entry.rating, 3)}</td>
-      <td>${entry.championships}</td>
-      <td>${formatNum(entry.promedio, 2)}</td>
-      <td>${formatNum(entry.saldoTotal, 2)}</td>
-    `;
+
+    if (entry.playerId === state.selectedPlayerId) {
+      tr.classList.add("rank-selected");
+    }
+
+    const posTd = document.createElement("td");
+    posTd.textContent = String(idx + 1);
+
+    const playerTd = document.createElement("td");
+    const playerBtn = document.createElement("button");
+    playerBtn.type = "button";
+    playerBtn.className = "player-name-btn";
+    playerBtn.textContent = entry.name;
+    playerBtn.addEventListener("click", () => {
+      state.selectedPlayerId = entry.playerId;
+      renderRanking();
+      renderPlayerDetail();
+      refs.playerDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    playerTd.appendChild(playerBtn);
+
+    const ratingTd = document.createElement("td");
+    ratingTd.textContent = formatNum(entry.rating, 3);
+
+    const championshipsTd = document.createElement("td");
+    championshipsTd.textContent = String(entry.championships);
+
+    const promedioTd = document.createElement("td");
+    promedioTd.textContent = formatNum(entry.promedio, 2);
+
+    const saldoTd = document.createElement("td");
+    saldoTd.textContent = formatNum(entry.saldoTotal, 2);
+
+    tr.appendChild(posTd);
+    tr.appendChild(playerTd);
+    tr.appendChild(ratingTd);
+    tr.appendChild(championshipsTd);
+    tr.appendChild(promedioTd);
+    tr.appendChild(saldoTd);
     refs.rankingBody.appendChild(tr);
   });
+}
+
+function renderPlayerDetail() {
+  refs.playerDetail.innerHTML = "";
+  if (!state.selectedPlayerId) {
+    refs.playerDetail.classList.add("hidden");
+    return;
+  }
+
+  const player = getPlayerById(state.selectedPlayerId);
+  if (!player) {
+    refs.playerDetail.classList.add("hidden");
+    return;
+  }
+
+  const participations = sortChampionshipsForView(state.data.championships)
+    .map((championship) => {
+      const result = championship.results.find((row) => row.playerId === state.selectedPlayerId);
+      if (!result) {
+        return null;
+      }
+      return {
+        championshipName: championship.name,
+        date: championship.date,
+        points: result.points,
+        saldo: result.saldo,
+      };
+    })
+    .filter(Boolean);
+
+  const title = document.createElement("h3");
+  title.className = "player-detail-title";
+  title.textContent = `Participaciones de ${player.name}`;
+
+  refs.playerDetail.appendChild(title);
+
+  if (!participations.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Este jugador no tiene participaciones registradas.";
+    refs.playerDetail.appendChild(empty);
+    refs.playerDetail.classList.remove("hidden");
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "player-detail-list";
+
+  participations.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "player-detail-item";
+    row.textContent = `${item.date} | ${item.championshipName} | Puntos: ${formatNum(item.points, 2)} | Saldo: ${formatNum(
+      item.saldo,
+      2,
+    )}`;
+    list.appendChild(row);
+  });
+
+  refs.playerDetail.appendChild(list);
+  refs.playerDetail.classList.remove("hidden");
+}
+
+function savePlayerNameChanges() {
+  const nameInputs = [...refs.nameEditor.querySelectorAll(".edit-player-name-input")];
+  if (!nameInputs.length) {
+    return;
+  }
+
+  const namesById = new Map();
+  const normalizedNames = new Set();
+
+  nameInputs.forEach((input) => {
+    const raw = String(input.value || "").trim().replace(/\s+/g, " ");
+    const normalized = normalizeName(raw);
+    if (!normalized) {
+      throw new Error("Todos los jugadores deben tener nombre.");
+    }
+    if (normalizedNames.has(normalized)) {
+      throw new Error(`Hay nombres duplicados en la edicion: "${raw}".`);
+    }
+    normalizedNames.add(normalized);
+    namesById.set(input.dataset.playerId, raw);
+  });
+
+  let changed = false;
+  state.data.players.forEach((player) => {
+    const nextName = namesById.get(player.id);
+    if (!nextName) {
+      return;
+    }
+    if (player.name !== nextName) {
+      player.name = nextName;
+      changed = true;
+    }
+  });
+
+  if (!changed) {
+    showToast("No hay cambios en nombres.");
+    return;
+  }
+
+  saveStore(state.data);
+  renderAll();
+  showToast("Nombres de jugadores actualizados.");
+}
+
+function renderNameEditor() {
+  refs.nameEditor.innerHTML = "";
+
+  if (!state.nameEditorOpen) {
+    refs.nameEditor.classList.add("hidden");
+    refs.toggleNameEditorBtn.textContent = "Editar nombres";
+    return;
+  }
+
+  refs.nameEditor.classList.remove("hidden");
+  refs.toggleNameEditorBtn.textContent = "Cerrar editor";
+
+  const head = document.createElement("div");
+  head.className = "name-editor-head";
+
+  const title = document.createElement("h3");
+  title.textContent = "Editar nombres de jugadores";
+
+  const actions = document.createElement("div");
+  actions.className = "championship-actions";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "btn btn-primary btn-sm";
+  saveBtn.textContent = "Guardar nombres";
+  saveBtn.addEventListener("click", () => {
+    try {
+      savePlayerNameChanges();
+    } catch (error) {
+      showToast(error.message || "No se pudieron guardar los nombres.", true);
+    }
+  });
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "btn btn-ghost btn-sm";
+  closeBtn.textContent = "Cancelar";
+  closeBtn.addEventListener("click", () => {
+    state.nameEditorOpen = false;
+    renderNameEditor();
+  });
+
+  actions.appendChild(saveBtn);
+  actions.appendChild(closeBtn);
+  head.appendChild(title);
+  head.appendChild(actions);
+  refs.nameEditor.appendChild(head);
+
+  if (!state.data.players.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Aun no hay jugadores para editar.";
+    refs.nameEditor.appendChild(empty);
+    return;
+  }
+
+  const grid = document.createElement("div");
+  grid.className = "name-editor-grid";
+
+  [...state.data.players]
+    .sort((a, b) => a.name.localeCompare(b.name, "es"))
+    .forEach((player) => {
+      const row = document.createElement("div");
+      row.className = "name-editor-row";
+
+      const currentName = document.createElement("input");
+      currentName.type = "text";
+      currentName.disabled = true;
+      currentName.value = player.name;
+
+      const editName = document.createElement("input");
+      editName.type = "text";
+      editName.className = "edit-player-name-input";
+      editName.dataset.playerId = player.id;
+      editName.value = player.name;
+      editName.maxLength = 80;
+
+      row.appendChild(currentName);
+      row.appendChild(editName);
+      grid.appendChild(row);
+    });
+
+  refs.nameEditor.appendChild(grid);
 }
 
 function sortChampionshipsForView(championships) {
@@ -496,6 +726,8 @@ function renderChampionships() {
 
 function renderAll() {
   renderRanking();
+  renderPlayerDetail();
+  renderNameEditor();
   renderChampionships();
 }
 
@@ -503,6 +735,11 @@ function bindUIEvents() {
   refs.toggleFormBtn.addEventListener("click", () => {
     const formCard = document.querySelector(".form-card");
     setFormCollapsed(!formCard.classList.contains("collapsed"));
+  });
+
+  refs.toggleNameEditorBtn.addEventListener("click", () => {
+    state.nameEditorOpen = !state.nameEditorOpen;
+    renderNameEditor();
   });
 
   refs.addRowBtn.addEventListener("click", () => {
