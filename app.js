@@ -10,6 +10,8 @@ const state = {
   editingChampionshipId: null,
   selectedPlayerId: null,
   nameEditorOpen: false,
+  playerTrendLimit: 5,
+  playerMovingAvgWindow: 3,
 };
 
 const refs = {
@@ -464,6 +466,62 @@ function renderRanking() {
   });
 }
 
+function sortChampionshipsAscending(championships) {
+  return [...championships].sort((a, b) => {
+    const byDate = String(a.date).localeCompare(String(b.date));
+    if (byDate !== 0) {
+      return byDate;
+    }
+    return String(a.createdAt).localeCompare(String(b.createdAt));
+  });
+}
+
+function getPlayerTimeline(playerId) {
+  const timeline = [];
+  let championships = 0;
+  let pointsTotal = 0;
+  let saldoTotal = 0;
+
+  sortChampionshipsAscending(state.data.championships).forEach((championship) => {
+    const result = championship.results.find((row) => row.playerId === playerId);
+    if (!result) {
+      return;
+    }
+
+    championships += 1;
+    pointsTotal += Number(result.points) || 0;
+    saldoTotal += Number(result.saldo) || 0;
+
+    const promedio = pointsTotal / championships;
+    const ajusteSaldo = saldoTotal * 0.1;
+    const factorExp = 1 + Math.min(0.15, Math.log(1 + championships) * 0.05);
+    const rating = (promedio + ajusteSaldo) * factorExp;
+    const tournamentScore = (Number(result.points) || 0) + (Number(result.saldo) || 0) * 0.1;
+
+    timeline.push({
+      championshipId: championship.id,
+      championshipName: championship.name,
+      date: championship.date,
+      points: Number(result.points) || 0,
+      saldo: Number(result.saldo) || 0,
+      tournamentScore,
+      rating,
+    });
+  });
+
+  return timeline;
+}
+
+function computeMovingAverage(series, windowSize) {
+  const normalizedWindow = Math.max(1, Math.floor(windowSize || 1));
+  return series.map((value, idx) => {
+    const start = Math.max(0, idx - normalizedWindow + 1);
+    const slice = series.slice(start, idx + 1);
+    const total = slice.reduce((sum, item) => sum + item, 0);
+    return total / slice.length;
+  });
+}
+
 function renderPlayerDetail() {
   refs.playerDetail.innerHTML = "";
   if (!state.selectedPlayerId) {
@@ -477,24 +535,12 @@ function renderPlayerDetail() {
     return;
   }
 
-  const participations = sortChampionshipsForView(state.data.championships)
-    .map((championship) => {
-      const result = championship.results.find((row) => row.playerId === state.selectedPlayerId);
-      if (!result) {
-        return null;
-      }
-      return {
-        championshipName: championship.name,
-        date: championship.date,
-        points: result.points,
-        saldo: result.saldo,
-      };
-    })
-    .filter(Boolean);
+  const timeline = getPlayerTimeline(state.selectedPlayerId);
+  const participations = [...timeline].reverse();
 
   const title = document.createElement("h3");
   title.className = "player-detail-title";
-  title.textContent = `Participaciones de ${player.name}`;
+  title.textContent = `Participaciones y estadisticas de ${player.name}`;
 
   refs.playerDetail.appendChild(title);
 
@@ -510,13 +556,104 @@ function renderPlayerDetail() {
   const list = document.createElement("div");
   list.className = "player-detail-list";
 
+  const bestTournament = timeline.reduce((best, item) => (item.tournamentScore > best.tournamentScore ? item : best), timeline[0]);
+  const worstTournament = timeline.reduce((worst, item) => (item.tournamentScore < worst.tournamentScore ? item : worst), timeline[0]);
+
+  const summary = document.createElement("div");
+  summary.className = "player-stat-grid";
+  summary.innerHTML = `
+    <div class="player-stat-item">
+      <strong>Mejor torneo</strong><br />
+      ${bestTournament.date} | ${bestTournament.championshipName}<br />
+      Score torneo: ${formatNum(bestTournament.tournamentScore, 2)}
+    </div>
+    <div class="player-stat-item">
+      <strong>Peor torneo</strong><br />
+      ${worstTournament.date} | ${worstTournament.championshipName}<br />
+      Score torneo: ${formatNum(worstTournament.tournamentScore, 2)}
+    </div>
+  `;
+  refs.playerDetail.appendChild(summary);
+
+  const controls = document.createElement("div");
+  controls.className = "player-trend-controls";
+
+  const limitLabel = document.createElement("label");
+  limitLabel.textContent = "Ultimos N campeonatos";
+  const limitInput = document.createElement("input");
+  limitInput.type = "number";
+  limitInput.min = "1";
+  limitInput.max = String(timeline.length);
+  limitInput.value = String(Math.min(state.playerTrendLimit, timeline.length));
+  limitInput.addEventListener("change", () => {
+    const value = Math.max(1, Math.min(timeline.length, Number(limitInput.value) || 1));
+    state.playerTrendLimit = value;
+    renderPlayerDetail();
+  });
+  limitLabel.appendChild(limitInput);
+
+  const windowLabel = document.createElement("label");
+  windowLabel.textContent = "Ventana promedio movil";
+  const windowInput = document.createElement("input");
+  windowInput.type = "number";
+  windowInput.min = "1";
+  windowInput.max = String(Math.min(timeline.length, state.playerTrendLimit));
+  windowInput.value = String(Math.max(1, Math.min(state.playerMovingAvgWindow, timeline.length)));
+  windowInput.addEventListener("change", () => {
+    const maxAllowed = Math.max(1, Math.min(timeline.length, state.playerTrendLimit));
+    const value = Math.max(1, Math.min(maxAllowed, Number(windowInput.value) || 1));
+    state.playerMovingAvgWindow = value;
+    renderPlayerDetail();
+  });
+  windowLabel.appendChild(windowInput);
+
+  controls.appendChild(limitLabel);
+  controls.appendChild(windowLabel);
+  refs.playerDetail.appendChild(controls);
+
+  const trendCount = Math.max(1, Math.min(state.playerTrendLimit, timeline.length));
+  const recentTrendChronological = timeline.slice(-trendCount);
+  const movingAvgWindow = Math.max(1, Math.min(state.playerMovingAvgWindow, recentTrendChronological.length));
+  const movingAvg = computeMovingAverage(
+    recentTrendChronological.map((item) => item.rating),
+    movingAvgWindow,
+  );
+
+  const trendTitle = document.createElement("h4");
+  trendTitle.className = "player-section-title";
+  trendTitle.textContent = `Tendencia de rating (ultimos ${trendCount})`;
+  refs.playerDetail.appendChild(trendTitle);
+
+  const trendList = document.createElement("div");
+  trendList.className = "player-detail-list";
+
+  [...recentTrendChronological]
+    .map((item, idx) => ({
+      ...item,
+      movingAvg: movingAvg[idx],
+    }))
+    .reverse()
+    .forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "player-detail-item";
+      row.textContent = `${item.date} | ${item.championshipName} | Rating: ${formatNum(item.rating, 3)} | Promedio movil(${movingAvgWindow}): ${formatNum(
+        item.movingAvg,
+        3,
+      )}`;
+      trendList.appendChild(row);
+    });
+
+  refs.playerDetail.appendChild(trendList);
+
+  const participationTitle = document.createElement("h4");
+  participationTitle.className = "player-section-title";
+  participationTitle.textContent = "Participaciones";
+  refs.playerDetail.appendChild(participationTitle);
+
   participations.forEach((item) => {
     const row = document.createElement("div");
     row.className = "player-detail-item";
-    row.textContent = `${item.date} | ${item.championshipName} | Puntos: ${formatNum(item.points, 2)} | Saldo: ${formatNum(
-      item.saldo,
-      2,
-    )}`;
+    row.textContent = `${item.date} | ${item.championshipName} | Puntos: ${formatNum(item.points, 2)} | Saldo: ${formatNum(item.saldo, 2)}`;
     list.appendChild(row);
   });
 
