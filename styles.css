@@ -281,7 +281,8 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(2),
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(3),
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(4),
-#ranking-body tr.rank-top:nth-child(1) td:nth-child(5) {
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(5),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(6) {
   color: var(--gold);
   font-weight: 700;
 }
@@ -289,7 +290,8 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(2),
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(3),
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(4),
-#ranking-body tr.rank-top:nth-child(2) td:nth-child(5) {
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(5),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(6) {
   color: var(--silver);
   font-weight: 700;
 }
@@ -297,7 +299,8 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(2),
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(3),
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(4),
-#ranking-body tr.rank-top:nth-child(3) td:nth-child(5) {
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(5),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(6) {
   color: var(--bronze);
   font-weight: 700;
 }
@@ -312,6 +315,40 @@ input:focus {
 
 #ranking-body tr.rank-top:nth-child(3) .player-name-btn {
   color: var(--bronze);
+}
+
+#ranking-body tr.rank-dynamic td:nth-child(1),
+#ranking-body tr.rank-dynamic td:nth-child(2),
+#ranking-body tr.rank-dynamic td:nth-child(3),
+#ranking-body tr.rank-dynamic td:nth-child(4),
+#ranking-body tr.rank-dynamic td:nth-child(5),
+#ranking-body tr.rank-dynamic td:nth-child(6) {
+  color: #9fd6ff;
+  font-weight: 600;
+}
+
+#ranking-body tr.rank-dynamic .player-name-btn {
+  color: #9fd6ff;
+}
+
+.championship-wins {
+  font-weight: 700;
+  color: #ffe600;
+  text-shadow: 0 0 0.5rem rgba(255, 230, 0, 0.5);
+}
+
+#ranking-body td.championship-wins {
+  color: #ffe600 !important;
+  text-shadow: 0 0 0.5rem rgba(255, 230, 0, 0.5);
+}
+
+.championship-wins-positive {
+  color: #ffe600;
+}
+
+.championship-wins-leader {
+  color: #ffe600;
+  text-shadow: 0 0 0.5rem rgba(255, 230, 0, 0.5);
 }
 
 .num-pos {

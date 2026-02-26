@@ -250,19 +250,37 @@ function computeRanking(championships, players) {
         statsMap.set(result.playerId, {
           playerId: result.playerId,
           championships: 0,
+          championshipsWon: 0,
           pointsTotal: 0,
           saldoTotalRaw: 0,
           saldoTotalForRating: 0,
           relativeTotal: 0,
         });
       }
+    });
+
+    let tournamentMaxPoints = -Infinity;
+    championship.results.forEach((result) => {
+      const points = Number(result.points) || 0;
+      if (points > tournamentMaxPoints) {
+        tournamentMaxPoints = points;
+      }
+    });
+
+    championship.results.forEach((result) => {
       const row = statsMap.get(result.playerId);
+      if (!row) {
+        return;
+      }
       row.championships += 1;
       row.pointsTotal += Number(result.points) || 0;
       row.saldoTotalRaw += Number(result.saldo) || 0;
       row.saldoTotalForRating += capSaldoForRating(result.saldo);
       const tournamentScore = getTournamentScore(result.points, result.saldo);
       row.relativeTotal += computeRelativeContribution(tournamentScore, context);
+      if ((Number(result.points) || 0) === tournamentMaxPoints) {
+        row.championshipsWon += 1;
+      }
     });
   });
 
@@ -285,6 +303,7 @@ function computeRanking(championships, players) {
       playerId: row.playerId,
       name: player.name,
       championships: row.championships,
+      championshipsWon: row.championshipsWon,
       promedio,
       saldoTotal: row.saldoTotalRaw,
       rating,
@@ -294,6 +313,9 @@ function computeRanking(championships, players) {
   ranking.sort((a, b) => {
     if (b.rating !== a.rating) {
       return b.rating - a.rating;
+    }
+    if (b.championshipsWon !== a.championshipsWon) {
+      return b.championshipsWon - a.championshipsWon;
     }
     if (b.saldoTotal !== a.saldoTotal) {
       return b.saldoTotal - a.saldoTotal;
@@ -513,10 +535,12 @@ function renderRanking() {
   if (!ranking.length) {
     state.selectedPlayerId = null;
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="6" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
+    tr.innerHTML = '<td colspan="7" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
     refs.rankingBody.appendChild(tr);
     return;
   }
+
+  const maxChampionshipWins = ranking.reduce((maxWins, entry) => Math.max(maxWins, entry.championshipsWon), 0);
 
   if (!ranking.some((entry) => entry.playerId === state.selectedPlayerId)) {
     state.selectedPlayerId = ranking[0].playerId;
@@ -575,6 +599,17 @@ function renderRanking() {
     championshipsTd.setAttribute("data-label", "Campeonatos");
     championshipsTd.textContent = String(entry.championships);
 
+    const championshipsWonTd = document.createElement("td");
+    championshipsWonTd.setAttribute("data-label", "Cantidad de campeonatos");
+    championshipsWonTd.textContent = String(entry.championshipsWon);
+    championshipsWonTd.classList.add("championship-wins");
+    if (entry.championshipsWon > 0) {
+      championshipsWonTd.classList.add("championship-wins-positive");
+    }
+    if (entry.championshipsWon > 0 && entry.championshipsWon === maxChampionshipWins) {
+      championshipsWonTd.classList.add("championship-wins-leader");
+    }
+
     const promedioTd = document.createElement("td");
     promedioTd.setAttribute("data-label", "Promedio");
     promedioTd.textContent = formatNum(entry.promedio, 2);
@@ -595,6 +630,7 @@ function renderRanking() {
     tr.appendChild(playerTd);
     tr.appendChild(ratingTd);
     tr.appendChild(championshipsTd);
+    tr.appendChild(championshipsWonTd);
     tr.appendChild(promedioTd);
     tr.appendChild(saldoTd);
     refs.rankingBody.appendChild(tr);
