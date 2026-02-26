@@ -1,6 +1,11 @@
 "use strict";
 
 const STORAGE_KEY = "billar_ranking_v1";
+const RATING_REGRESSION_K = 2;
+const SALDO_CAP_PER_TOURNAMENT = 25;
+const TOURNAMENT_REFERENCE_SIZE = 16;
+const RELATIVE_Z_CAP = 2.5;
+const RELATIVE_SCORE_SCALE = 2.5;
 
 const state = {
   data: {
@@ -142,23 +147,122 @@ function parseNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
-function computeRanking(championships, players) {
-  const statsMap = new Map();
+function capSaldoForRating(saldo) {
+  const numericSaldo = Number(saldo) || 0;
+  return Math.max(-SALDO_CAP_PER_TOURNAMENT, Math.min(SALDO_CAP_PER_TOURNAMENT, numericSaldo));
+}
+
+function getTournamentScore(points, saldo) {
+  return (Number(points) || 0) + capSaldoForRating(saldo) * 0.1;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function computeChampionshipContexts(championships) {
+  const contexts = new Map();
 
   championships.forEach((championship) => {
+    const scores = championship.results.map((result) => getTournamentScore(result.points, result.saldo));
+    const participants = scores.length;
+
+    if (!participants) {
+      contexts.set(championship.id, {
+        mean: 0,
+        std: 0,
+        sizeWeight: 0,
+      });
+      return;
+    }
+
+    const mean = scores.reduce((sum, value) => sum + value, 0) / participants;
+    const variance = scores.reduce((sum, value) => {
+      const diff = value - mean;
+      return sum + diff * diff;
+    }, 0) / participants;
+    const std = Math.sqrt(variance);
+    const sizeWeight = Math.min(1, Math.sqrt(participants / TOURNAMENT_REFERENCE_SIZE));
+
+    contexts.set(championship.id, {
+      mean,
+      std,
+      sizeWeight,
+    });
+  });
+
+  return contexts;
+}
+
+function computeRelativeContribution(score, context) {
+  if (!context || context.std <= 0) {
+    return 0;
+  }
+  const zScore = (score - context.mean) / context.std;
+  const cappedZScore = clamp(zScore, -RELATIVE_Z_CAP, RELATIVE_Z_CAP);
+  return cappedZScore * RELATIVE_SCORE_SCALE * context.sizeWeight;
+}
+
+function computeGlobalBaselineScore(championships) {
+  let participations = 0;
+  let scoreTotal = 0;
+
+  championships.forEach((championship) => {
+    championship.results.forEach((result) => {
+      scoreTotal += getTournamentScore(result.points, result.saldo);
+      participations += 1;
+    });
+  });
+
+  if (participations <= 0) {
+    return 0;
+  }
+  return scoreTotal / participations;
+}
+
+function computeRawRating(pointsTotal, saldoTotal, championshipsCount) {
+  if (championshipsCount <= 0) {
+    return 0;
+  }
+  const promedio = pointsTotal / championshipsCount;
+  const ajusteSaldo = saldoTotal * 0.1;
+  const factorExp = 1 + Math.min(0.15, Math.log(1 + championshipsCount) * 0.05);
+  return (promedio + ajusteSaldo) * factorExp;
+}
+
+function applyRegressionToMean(rawRating, championshipsCount, baselineScore) {
+  if (championshipsCount !== 1) {
+    return rawRating;
+  }
+  const weight = championshipsCount / (championshipsCount + RATING_REGRESSION_K);
+  return rawRating * weight + baselineScore * (1 - weight);
+}
+
+function computeRanking(championships, players) {
+  const statsMap = new Map();
+  const baselineScore = computeGlobalBaselineScore(championships);
+  const championshipContexts = computeChampionshipContexts(championships);
+
+  championships.forEach((championship) => {
+    const context = championshipContexts.get(championship.id);
     championship.results.forEach((result) => {
       if (!statsMap.has(result.playerId)) {
         statsMap.set(result.playerId, {
           playerId: result.playerId,
           championships: 0,
           pointsTotal: 0,
-          saldoTotal: 0,
+          saldoTotalRaw: 0,
+          saldoTotalForRating: 0,
+          relativeTotal: 0,
         });
       }
       const row = statsMap.get(result.playerId);
       row.championships += 1;
       row.pointsTotal += Number(result.points) || 0;
-      row.saldoTotal += Number(result.saldo) || 0;
+      row.saldoTotalRaw += Number(result.saldo) || 0;
+      row.saldoTotalForRating += capSaldoForRating(result.saldo);
+      const tournamentScore = getTournamentScore(result.points, result.saldo);
+      row.relativeTotal += computeRelativeContribution(tournamentScore, context);
     });
   });
 
@@ -172,16 +276,17 @@ function computeRanking(championships, players) {
       return;
     }
     const promedio = row.pointsTotal / row.championships;
-    const ajusteSaldo = row.saldoTotal * 0.1;
-    const factorExp = 1 + Math.min(0.15, Math.log(1 + row.championships) * 0.05);
-    const rating = (promedio + ajusteSaldo) * factorExp;
+    const rawRating = computeRawRating(row.pointsTotal, row.saldoTotalForRating, row.championships);
+    const relativeAdjustment = row.relativeTotal / row.championships;
+    const adjustedRating = rawRating + relativeAdjustment;
+    const rating = applyRegressionToMean(adjustedRating, row.championships, baselineScore);
 
     ranking.push({
       playerId: row.playerId,
       name: player.name,
       championships: row.championships,
       promedio,
-      saldoTotal: row.saldoTotal,
+      saldoTotal: row.saldoTotalRaw,
       rating,
     });
   });
@@ -508,9 +613,12 @@ function sortChampionshipsAscending(championships) {
 
 function getPlayerTimeline(playerId) {
   const timeline = [];
+  const baselineScore = computeGlobalBaselineScore(state.data.championships);
+  const championshipContexts = computeChampionshipContexts(state.data.championships);
   let championships = 0;
   let pointsTotal = 0;
-  let saldoTotal = 0;
+  let saldoTotalForRating = 0;
+  let relativeTotal = 0;
 
   sortChampionshipsAscending(state.data.championships).forEach((championship) => {
     const result = championship.results.find((row) => row.playerId === playerId);
@@ -520,20 +628,23 @@ function getPlayerTimeline(playerId) {
 
     championships += 1;
     pointsTotal += Number(result.points) || 0;
-    saldoTotal += Number(result.saldo) || 0;
+    const saldoRaw = Number(result.saldo) || 0;
+    saldoTotalForRating += capSaldoForRating(saldoRaw);
+    const tournamentScore = getTournamentScore(result.points, saldoRaw);
+    const context = championshipContexts.get(championship.id);
+    relativeTotal += computeRelativeContribution(tournamentScore, context);
 
-    const promedio = pointsTotal / championships;
-    const ajusteSaldo = saldoTotal * 0.1;
-    const factorExp = 1 + Math.min(0.15, Math.log(1 + championships) * 0.05);
-    const rating = (promedio + ajusteSaldo) * factorExp;
-    const tournamentScore = (Number(result.points) || 0) + (Number(result.saldo) || 0) * 0.1;
+    const rawRating = computeRawRating(pointsTotal, saldoTotalForRating, championships);
+    const relativeAdjustment = relativeTotal / championships;
+    const adjustedRating = rawRating + relativeAdjustment;
+    const rating = applyRegressionToMean(adjustedRating, championships, baselineScore);
 
     timeline.push({
       championshipId: championship.id,
       championshipName: championship.name,
       date: championship.date,
       points: Number(result.points) || 0,
-      saldo: Number(result.saldo) || 0,
+      saldo: saldoRaw,
       tournamentScore,
       rating,
     });
