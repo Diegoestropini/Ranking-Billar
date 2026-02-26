@@ -278,6 +278,42 @@ input:focus {
   color: var(--bronze);
 }
 
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(2),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(3),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(4),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(5) {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(2),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(3),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(4),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(5) {
+  color: var(--silver);
+  font-weight: 700;
+}
+
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(2),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(3),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(4),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(5) {
+  color: var(--bronze);
+  font-weight: 700;
+}
+
+#ranking-body tr.rank-top:nth-child(1) .player-name-btn {
+  color: var(--gold);
+}
+
+#ranking-body tr.rank-top:nth-child(2) .player-name-btn {
+  color: var(--silver);
+}
+
+#ranking-body tr.rank-top:nth-child(3) .player-name-btn {
+  color: var(--bronze);
+}
+
 .num-pos {
   color: #8ef8cc;
   font-weight: 700;
