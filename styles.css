@@ -5,14 +5,18 @@
   --bg-1: #091228;
   --bg-2: #0e1b37;
   --panel: rgba(8, 18, 40, 0.75);
+  --panel-soft: rgba(5, 13, 31, 0.72);
   --panel-border: rgba(74, 224, 255, 0.38);
   --text: #ecf8ff;
   --muted: #a9c8da;
   --cyan: #4ae0ff;
   --blue: #4f8dff;
+  --gold: #ffcf6d;
+  --silver: #d8e4ff;
+  --bronze: #e7a87a;
   --danger: #ff4f83;
   --ok: #5ef2b9;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
   --glow-soft: 0 0 0.8rem rgba(74, 224, 255, 0.45);
   --glow-hard: 0 0 1.1rem rgba(79, 141, 255, 0.6);
 }
@@ -67,12 +71,13 @@ body {
   font-size: clamp(1.5rem, 2.5vw, 2.2rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-shadow: var(--glow-hard);
+  text-shadow: 0 0 0.6rem rgba(79, 141, 255, 0.4);
 }
 
 .topbar p {
   margin: 0.5rem 0 0;
   color: var(--muted);
+  font-size: 0.96rem;
 }
 
 .layout {
@@ -85,10 +90,10 @@ body {
 }
 
 .card {
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel), var(--panel-soft));
   border: 1px solid var(--panel-border);
   border-radius: 18px;
-  box-shadow: var(--shadow), inset 0 0 0.8rem rgba(74, 224, 255, 0.08);
+  box-shadow: var(--shadow), inset 0 0 0.5rem rgba(74, 224, 255, 0.06);
   backdrop-filter: blur(8px);
   padding: 1rem;
 }
@@ -183,18 +188,30 @@ input:focus {
   min-width: 580px;
 }
 
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(5, 14, 33, 0.95);
+  backdrop-filter: blur(3px);
+}
+
 .data-table th,
 .data-table td {
   text-align: left;
   border-bottom: 1px solid rgba(74, 224, 255, 0.2);
-  padding: 0.58rem 0.45rem;
+  padding: 0.62rem 0.5rem;
 }
 
 .data-table th {
-  font-size: 0.82rem;
-  color: #b7e9ff;
+  font-size: 0.79rem;
+  color: #c5ecff;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.data-table tbody tr:nth-child(even) td {
+  background: rgba(74, 224, 255, 0.035);
 }
 
 .data-table tr:hover td {
@@ -233,6 +250,48 @@ input:focus {
   box-shadow: inset 0 0 0 1px rgba(94, 242, 185, 0.9);
 }
 
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(170, 208, 232, 0.42);
+  background: rgba(14, 32, 61, 0.8);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.48rem;
+}
+
+.rank-1 {
+  border-color: rgba(255, 207, 109, 0.85);
+  color: var(--gold);
+}
+
+.rank-2 {
+  border-color: rgba(216, 228, 255, 0.85);
+  color: var(--silver);
+}
+
+.rank-3 {
+  border-color: rgba(231, 168, 122, 0.85);
+  color: var(--bronze);
+}
+
+.num-pos {
+  color: #8ef8cc;
+  font-weight: 700;
+}
+
+.num-neg {
+  color: #ff9fbc;
+  font-weight: 700;
+}
+
+.num-zero {
+  color: #d2e8f6;
+}
+
 .player-name-btn {
   border: 0;
   background: transparent;
@@ -259,7 +318,8 @@ input:focus {
 .btn {
   border: 1px solid transparent;
   border-radius: 11px;
-  padding: 0.55rem 0.85rem;
+  padding: 0.55rem 0.9rem;
+  min-height: 2.3rem;
   color: var(--text);
   cursor: pointer;
   font-family: "Exo 2", "Trebuchet MS", sans-serif;
@@ -269,6 +329,13 @@ input:focus {
 
 .btn:hover {
   transform: translateY(-1px);
+}
+
+.btn:focus-visible,
+input:focus-visible,
+.player-name-btn:focus-visible {
+  outline: 2px solid rgba(120, 224, 255, 0.85);
+  outline-offset: 2px;
 }
 
 .btn-primary {
@@ -295,6 +362,7 @@ input:focus {
 .btn-sm {
   padding: 0.35rem 0.65rem;
   font-size: 0.82rem;
+  min-height: 2rem;
 }
 
 .form-card.collapsed #championship-form {
@@ -428,6 +496,17 @@ input:focus {
   line-height: 1.35;
 }
 
+.player-stat-best {
+  border-color: rgba(94, 242, 185, 0.35);
+  color: #c9ffe7;
+}
+
+.player-stat-worst {
+  border-color: rgba(255, 79, 131, 0.55);
+  color: #ffd1df;
+  background: rgba(25, 0, 8, 0.88);
+}
+
 .player-trend-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -454,6 +533,26 @@ input:focus {
   background: rgba(0, 0, 0, 0.9);
   color: #c9ffe7;
   font-size: 0.9rem;
+}
+
+.player-section-trend {
+  color: #6de1ff;
+}
+
+.player-section-participations {
+  color: #ffcf6d;
+}
+
+.player-detail-item-trend {
+  border-color: rgba(109, 225, 255, 0.45);
+  background: rgba(3, 20, 31, 0.9);
+  color: #6de1ff;
+}
+
+.player-detail-item-participation {
+  border-color: rgba(255, 207, 109, 0.45);
+  background: rgba(28, 19, 3, 0.9);
+  color: #ffcf6d;
 }
 
 .name-editor-head {
@@ -490,6 +589,27 @@ input:focus {
   padding: 0.4rem 0.2rem;
 }
 
+.empty-state {
+  border: 1px dashed rgba(74, 224, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(7, 18, 39, 0.62);
+  padding: 0.75rem 0.8rem;
+  font-style: normal;
+}
+
+.empty-state::before {
+  content: "INFO";
+  display: inline-block;
+  margin-right: 0.45rem;
+  border: 1px solid rgba(74, 224, 255, 0.45);
+  border-radius: 999px;
+  padding: 0.1rem 0.42rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #bceeff;
+}
+
 .toast {
   position: fixed;
   right: 1rem;
@@ -522,6 +642,65 @@ input:focus {
   }
 }
 
+@media (max-width: 760px) {
+  #ranking-table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 0.55rem;
+  }
+
+  #ranking-table thead {
+    display: none;
+  }
+
+  #ranking-table,
+  #ranking-table tbody,
+  #ranking-table tr,
+  #ranking-table td {
+    display: block;
+    width: 100%;
+  }
+
+  #ranking-table tr {
+    border: 1px solid rgba(74, 224, 255, 0.26);
+    border-radius: 12px;
+    padding: 0.38rem 0.65rem;
+    background: rgba(5, 14, 32, 0.82);
+  }
+
+  #ranking-table tr.rank-top td,
+  #ranking-table tr.rank-dynamic td,
+  #ranking-table tr:hover td {
+    background: transparent;
+  }
+
+  #ranking-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.8rem;
+    border-bottom: 1px dashed rgba(74, 224, 255, 0.18);
+    padding: 0.45rem 0;
+  }
+
+  #ranking-table td:last-child {
+    border-bottom: 0;
+  }
+
+  #ranking-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  #ranking-table td.empty::before {
+    content: "";
+  }
+}
+
 @media (max-width: 620px) {
   .field-grid {
     grid-template-columns: 1fr;
@@ -529,6 +708,10 @@ input:focus {
 
   .data-table {
     min-width: 520px;
+  }
+
+  #ranking-table {
+    min-width: 0;
   }
 
   .name-editor-row {

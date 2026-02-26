@@ -128,6 +128,12 @@ function formatNum(value, decimals = 2) {
   return Number(value || 0).toFixed(decimals);
 }
 
+function formatSigned(value, decimals = 2) {
+  const num = Number(value || 0);
+  const fixed = num.toFixed(decimals);
+  return num > 0 ? `+${fixed}` : fixed;
+}
+
 function parseNumber(value) {
   if (value === "" || value === null || typeof value === "undefined") {
     return null;
@@ -402,7 +408,7 @@ function renderRanking() {
   if (!ranking.length) {
     state.selectedPlayerId = null;
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="6" class="empty">Sin datos de ranking todavia.</td>';
+    tr.innerHTML = '<td colspan="6" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
     refs.rankingBody.appendChild(tr);
     return;
   }
@@ -429,9 +435,21 @@ function renderRanking() {
     }
 
     const posTd = document.createElement("td");
-    posTd.textContent = String(idx + 1);
+    posTd.setAttribute("data-label", "Pos");
+    const rankBadge = document.createElement("span");
+    rankBadge.className = "rank-badge";
+    if (idx === 0) {
+      rankBadge.classList.add("rank-1");
+    } else if (idx === 1) {
+      rankBadge.classList.add("rank-2");
+    } else if (idx === 2) {
+      rankBadge.classList.add("rank-3");
+    }
+    rankBadge.textContent = `#${idx + 1}`;
+    posTd.appendChild(rankBadge);
 
     const playerTd = document.createElement("td");
+    playerTd.setAttribute("data-label", "Jugador");
     const playerBtn = document.createElement("button");
     playerBtn.type = "button";
     playerBtn.className = "player-name-btn";
@@ -445,16 +463,28 @@ function renderRanking() {
     playerTd.appendChild(playerBtn);
 
     const ratingTd = document.createElement("td");
+    ratingTd.setAttribute("data-label", "Rating");
     ratingTd.textContent = formatNum(entry.rating, 3);
 
     const championshipsTd = document.createElement("td");
+    championshipsTd.setAttribute("data-label", "Campeonatos");
     championshipsTd.textContent = String(entry.championships);
 
     const promedioTd = document.createElement("td");
+    promedioTd.setAttribute("data-label", "Promedio");
     promedioTd.textContent = formatNum(entry.promedio, 2);
 
     const saldoTd = document.createElement("td");
-    saldoTd.textContent = formatNum(entry.saldoTotal, 2);
+    saldoTd.setAttribute("data-label", "Saldo");
+    saldoTd.textContent = formatSigned(entry.saldoTotal, 2);
+    const saldoNum = Number(entry.saldoTotal) || 0;
+    if (saldoNum > 0) {
+      saldoTd.classList.add("num-pos");
+    } else if (saldoNum < 0) {
+      saldoTd.classList.add("num-neg");
+    } else {
+      saldoTd.classList.add("num-zero");
+    }
 
     tr.appendChild(posTd);
     tr.appendChild(playerTd);
@@ -546,7 +576,7 @@ function renderPlayerDetail() {
 
   if (!participations.length) {
     const empty = document.createElement("p");
-    empty.className = "empty";
+    empty.className = "empty empty-state";
     empty.textContent = "Este jugador no tiene participaciones registradas.";
     refs.playerDetail.appendChild(empty);
     refs.playerDetail.classList.remove("hidden");
@@ -554,7 +584,7 @@ function renderPlayerDetail() {
   }
 
   const list = document.createElement("div");
-  list.className = "player-detail-list";
+  list.className = "player-detail-list player-participation-list";
 
   const bestTournament = timeline.reduce((best, item) => (item.tournamentScore > best.tournamentScore ? item : best), timeline[0]);
   const worstTournament = timeline.reduce((worst, item) => (item.tournamentScore < worst.tournamentScore ? item : worst), timeline[0]);
@@ -562,12 +592,12 @@ function renderPlayerDetail() {
   const summary = document.createElement("div");
   summary.className = "player-stat-grid";
   summary.innerHTML = `
-    <div class="player-stat-item">
+    <div class="player-stat-item player-stat-best">
       <strong>Mejor torneo</strong><br />
       ${bestTournament.date} | ${bestTournament.championshipName}<br />
       Score torneo: ${formatNum(bestTournament.tournamentScore, 2)}
     </div>
-    <div class="player-stat-item">
+    <div class="player-stat-item player-stat-worst">
       <strong>Peor torneo</strong><br />
       ${worstTournament.date} | ${worstTournament.championshipName}<br />
       Score torneo: ${formatNum(worstTournament.tournamentScore, 2)}
@@ -620,12 +650,12 @@ function renderPlayerDetail() {
   );
 
   const trendTitle = document.createElement("h4");
-  trendTitle.className = "player-section-title";
+  trendTitle.className = "player-section-title player-section-trend";
   trendTitle.textContent = `Tendencia de rating (ultimos ${trendCount})`;
   refs.playerDetail.appendChild(trendTitle);
 
   const trendList = document.createElement("div");
-  trendList.className = "player-detail-list";
+  trendList.className = "player-detail-list player-trend-list";
 
   [...recentTrendChronological]
     .map((item, idx) => ({
@@ -635,7 +665,7 @@ function renderPlayerDetail() {
     .reverse()
     .forEach((item) => {
       const row = document.createElement("div");
-      row.className = "player-detail-item";
+      row.className = "player-detail-item player-detail-item-trend";
       row.textContent = `${item.date} | ${item.championshipName} | Rating: ${formatNum(item.rating, 3)} | Promedio movil(${movingAvgWindow}): ${formatNum(
         item.movingAvg,
         3,
@@ -646,13 +676,13 @@ function renderPlayerDetail() {
   refs.playerDetail.appendChild(trendList);
 
   const participationTitle = document.createElement("h4");
-  participationTitle.className = "player-section-title";
+  participationTitle.className = "player-section-title player-section-participations";
   participationTitle.textContent = "Participaciones";
   refs.playerDetail.appendChild(participationTitle);
 
   participations.forEach((item) => {
     const row = document.createElement("div");
-    row.className = "player-detail-item";
+    row.className = "player-detail-item player-detail-item-participation";
     row.textContent = `${item.date} | ${item.championshipName} | Puntos: ${formatNum(item.points, 2)} | Saldo: ${formatNum(item.saldo, 2)}`;
     list.appendChild(row);
   });
@@ -755,7 +785,7 @@ function renderNameEditor() {
 
   if (!state.data.players.length) {
     const empty = document.createElement("p");
-    empty.className = "empty";
+    empty.className = "empty empty-state";
     empty.textContent = "Aun no hay jugadores para editar.";
     refs.nameEditor.appendChild(empty);
     return;
@@ -806,8 +836,8 @@ function renderChampionships() {
 
   if (!list.length) {
     const empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = "Aun no hay campeonatos cargados.";
+    empty.className = "empty empty-state";
+    empty.textContent = "Aun no hay campeonatos cargados. Completa el formulario para crear el primero.";
     refs.championshipList.appendChild(empty);
     return;
   }
