@@ -980,6 +980,16 @@ function sortChampionshipsForView(championships) {
 function renderChampionships() {
   refs.championshipList.innerHTML = "";
   const list = sortChampionshipsForView(state.data.championships);
+  const historyColors = [
+    "#4ae0ff",
+    "#5ef2b9",
+    "#ffcf6d",
+    "#ff8ec7",
+    "#9f9cff",
+    "#7ff0d2",
+    "#ff9f7a",
+    "#9ed6ff"
+  ];
 
   if (!list.length) {
     const empty = document.createElement("p");
@@ -989,9 +999,10 @@ function renderChampionships() {
     return;
   }
 
-  list.forEach((championship) => {
+  list.forEach((championship, index) => {
     const item = document.createElement("article");
     item.className = "championship-item";
+    item.style.setProperty("--history-color", historyColors[index % historyColors.length]);
 
     const left = document.createElement("div");
     left.innerHTML = `

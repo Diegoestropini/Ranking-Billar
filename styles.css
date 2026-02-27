@@ -505,19 +505,26 @@ input:focus-visible,
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  border: 1px solid rgba(74, 224, 255, 0.24);
+  border: 1px solid color-mix(in srgb, var(--history-color, #4ae0ff) 48%, transparent);
   border-radius: 12px;
   padding: 0.65rem 0.75rem;
-  background: rgba(4, 15, 33, 0.65);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--history-color, #4ae0ff) 22%, transparent),
+      rgba(4, 15, 33, 0.65) 34%
+    );
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--history-color, #4ae0ff) 78%, transparent);
 }
 
 .championship-item h4 {
   margin: 0;
   font-size: 0.97rem;
+  color: color-mix(in srgb, var(--history-color, #4ae0ff) 72%, #ffffff);
 }
 
 .championship-meta {
-  color: var(--muted);
+  color: color-mix(in srgb, var(--history-color, #4ae0ff) 48%, var(--muted));
   font-size: 0.85rem;
 }
 
