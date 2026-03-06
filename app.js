@@ -246,7 +246,14 @@ function openDatabase() {
     };
 
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("No se pudo abrir IndexedDB."));
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error || new Error("No se pudo abrir IndexedDB."));
+    };
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(new Error("IndexedDB esta bloqueada por otra pestana o proceso."));
+    };
   });
 
   return dbPromise;
@@ -1132,18 +1139,29 @@ function renderPlayerDetail() {
 
   const summary = document.createElement("div");
   summary.className = "player-stat-grid";
-  summary.innerHTML = `
-    <div class="player-stat-item player-stat-best">
-      <strong>Mejor torneo</strong><br />
-      ${bestTournament.date} | ${bestTournament.championshipName}<br />
-      Score torneo: ${formatNum(bestTournament.tournamentScore, 2)}
-    </div>
-    <div class="player-stat-item player-stat-worst">
-      <strong>Peor torneo</strong><br />
-      ${worstTournament.date} | ${worstTournament.championshipName}<br />
-      Score torneo: ${formatNum(worstTournament.tournamentScore, 2)}
-    </div>
-  `;
+
+  const bestItem = document.createElement("div");
+  bestItem.className = "player-stat-item player-stat-best";
+  const bestStrong = document.createElement("strong");
+  bestStrong.textContent = "Mejor torneo";
+  bestItem.appendChild(bestStrong);
+  bestItem.appendChild(document.createElement("br"));
+  bestItem.appendChild(document.createTextNode(`${bestTournament.date} | ${bestTournament.championshipName}`));
+  bestItem.appendChild(document.createElement("br"));
+  bestItem.appendChild(document.createTextNode(`Score torneo: ${formatNum(bestTournament.tournamentScore, 2)}`));
+
+  const worstItem = document.createElement("div");
+  worstItem.className = "player-stat-item player-stat-worst";
+  const worstStrong = document.createElement("strong");
+  worstStrong.textContent = "Peor torneo";
+  worstItem.appendChild(worstStrong);
+  worstItem.appendChild(document.createElement("br"));
+  worstItem.appendChild(document.createTextNode(`${worstTournament.date} | ${worstTournament.championshipName}`));
+  worstItem.appendChild(document.createElement("br"));
+  worstItem.appendChild(document.createTextNode(`Score torneo: ${formatNum(worstTournament.tournamentScore, 2)}`));
+
+  summary.appendChild(bestItem);
+  summary.appendChild(worstItem);
   refs.playerDetail.appendChild(summary);
 
   const controls = document.createElement("div");
@@ -1411,10 +1429,13 @@ function renderChampionships() {
     item.style.setProperty("--history-color", historyColors[index % historyColors.length]);
 
     const left = document.createElement("div");
-    left.innerHTML = `
-      <h4>${championship.name}</h4>
-      <p class="championship-meta">${championship.date} | ${championship.results.length} jugadores</p>
-    `;
+    const title = document.createElement("h4");
+    title.textContent = championship.name;
+    const metaText = document.createElement("p");
+    metaText.className = "championship-meta";
+    metaText.textContent = `${championship.date} | ${championship.results.length} jugadores`;
+    left.appendChild(title);
+    left.appendChild(metaText);
 
     const actions = document.createElement("div");
     actions.className = "championship-actions";
@@ -1513,11 +1534,15 @@ function renderBackups() {
 
     const meta = document.createElement("div");
     meta.className = "backup-meta";
-    meta.innerHTML = `
-      <strong>${backup.label}</strong>
-      <span>${formatDateTime(backup.createdAt)}</span>
-      <span>${backup.data.championships.length} campeonatos | ${backup.data.players.length} jugadores</span>
-    `;
+    const label = document.createElement("strong");
+    label.textContent = backup.label;
+    const createdAt = document.createElement("span");
+    createdAt.textContent = formatDateTime(backup.createdAt);
+    const counts = document.createElement("span");
+    counts.textContent = `${backup.data.championships.length} campeonatos | ${backup.data.players.length} jugadores`;
+    meta.appendChild(label);
+    meta.appendChild(createdAt);
+    meta.appendChild(counts);
 
     const actions = document.createElement("div");
     actions.className = "backup-actions";
@@ -1698,12 +1723,4 @@ async function init() {
 }
 
 init();
-
-
-
-
-
-
-
-
 
