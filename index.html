@@ -16,6 +16,33 @@
     </header>
 
     <main class="layout">
+      <section class="card data-card collapsed">
+        <button id="toggle-data-btn" type="button" class="data-toggle" aria-expanded="false">
+          <span>Persistencia y backups</span>
+          <div class="title-actions">
+            <span id="storage-status" class="badge">Cargando...</span>
+            <span id="data-toggle-label">Desplegar</span>
+          </div>
+        </button>
+
+        <div id="data-panel" class="data-panel hidden">
+          <div class="data-actions">
+            <button id="backup-btn" type="button" class="btn btn-secondary">Crear backup</button>
+            <button id="export-btn" type="button" class="btn btn-primary">Exportar JSON</button>
+            <label class="btn btn-ghost file-btn">
+              Importar JSON
+              <input id="import-input" type="file" accept="application/json,.json" hidden />
+            </label>
+          </div>
+
+          <p class="data-hint">
+            Los datos se guardan en IndexedDB del navegador. También puedes exportarlos a JSON o restaurar backups recientes.
+          </p>
+
+          <div id="backup-list" class="backup-list"></div>
+        </div>
+      </section>
+
       <section class="card form-card">
         <div class="card-title-row">
           <h2 id="form-title">Nuevo campeonato</h2>
@@ -115,3 +142,4 @@
     <script src="app.js"></script>
   </body>
 </html>
+

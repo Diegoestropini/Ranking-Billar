@@ -1,6 +1,14 @@
 "use strict";
 
 const STORAGE_KEY = "billar_ranking_v1";
+const BACKUP_STORAGE_KEY = "billar_ranking_backups_v1";
+const APP_SCHEMA_VERSION = 2;
+const MAX_BACKUPS = 20;
+const DB_NAME = "billar-ranking-db";
+const DB_VERSION = 1;
+const DB_MAIN_STORE = "kv";
+const DB_BACKUP_STORE = "backups";
+const DB_STATE_KEY = "app_state";
 const RATING_REGRESSION_K = 2;
 const SALDO_CAP_PER_TOURNAMENT = 25;
 const TOURNAMENT_REFERENCE_SIZE = 16;
@@ -12,6 +20,7 @@ const state = {
     players: [],
     championships: [],
   },
+  backups: [],
   editingChampionshipId: null,
   selectedPlayerId: null,
   nameEditorOpen: false,
@@ -19,6 +28,9 @@ const state = {
   playerMovingAvgWindow: 3,
   playerParticipationExpanded: false,
   championshipHistoryExpanded: false,
+  persistenceMode: "localStorage",
+  persistenceReady: false,
+  dataPanelOpen: false,
 };
 
 const refs = {
@@ -40,7 +52,17 @@ const refs = {
   nameEditor: document.getElementById("name-editor"),
   championshipList: document.getElementById("championship-list"),
   toast: document.getElementById("toast"),
+  toggleDataBtn: document.getElementById("toggle-data-btn"),
+  dataPanel: document.getElementById("data-panel"),
+  dataToggleLabel: document.getElementById("data-toggle-label"),
+  storageStatus: document.getElementById("storage-status"),
+  backupBtn: document.getElementById("backup-btn"),
+  exportBtn: document.getElementById("export-btn"),
+  importInput: document.getElementById("import-input"),
+  backupList: document.getElementById("backup-list"),
 };
+
+let dbPromise = null;
 
 function createId(prefix) {
   const rand = Math.random().toString(36).slice(2, 8);
@@ -51,24 +73,377 @@ function normalizeName(name) {
   return String(name || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function loadStore() {
+function createEmptyData() {
+  return { players: [], championships: [] };
+}
+
+function cloneData(data) {
+  return JSON.parse(JSON.stringify(data || createEmptyData()));
+}
+
+function sanitizePlayer(player, index) {
+  if (!player || typeof player !== "object") {
+    throw new Error(`Jugador invalido en posicion ${index + 1}.`);
+  }
+
+  const name = String(player.name || "").trim().replace(/\s+/g, " ");
+  if (!name) {
+    throw new Error(`Jugador invalido en posicion ${index + 1}: falta nombre.`);
+  }
+
+  return {
+    id: String(player.id || createId("p")),
+    name,
+    createdAt: String(player.createdAt || new Date().toISOString()),
+  };
+}
+
+function sanitizeResult(result, playerIds, championshipName, index) {
+  if (!result || typeof result !== "object") {
+    throw new Error(`Resultado invalido en ${championshipName || "campeonato"}.`);
+  }
+
+  const playerId = String(result.playerId || "");
+  if (!playerId || !playerIds.has(playerId)) {
+    throw new Error(`Resultado invalido en ${championshipName || "campeonato"}: jugador no encontrado.`);
+  }
+
+  const points = Number(result.points);
+  const saldo = Number(result.saldo);
+  if (!Number.isFinite(points) || !Number.isFinite(saldo)) {
+    throw new Error(`Resultado invalido en ${championshipName || "campeonato"}, fila ${index + 1}.`);
+  }
+
+  return {
+    playerId,
+    points,
+    saldo,
+  };
+}
+
+function sanitizeChampionship(championship, playerIds, index) {
+  if (!championship || typeof championship !== "object") {
+    throw new Error(`Campeonato invalido en posicion ${index + 1}.`);
+  }
+
+  const name = String(championship.name || "").trim();
+  const date = String(championship.date || "").trim();
+  if (!name || !date) {
+    throw new Error(`Campeonato invalido en posicion ${index + 1}: faltan nombre o fecha.`);
+  }
+
+  const rawResults = Array.isArray(championship.results) ? championship.results : [];
+  const seenPlayers = new Set();
+  const results = rawResults.map((result, resultIndex) => {
+    const sanitized = sanitizeResult(result, playerIds, name, resultIndex);
+    if (seenPlayers.has(sanitized.playerId)) {
+      throw new Error(`Campeonato "${name}" tiene jugadores repetidos.`);
+    }
+    seenPlayers.add(sanitized.playerId);
+    return sanitized;
+  });
+
+  return {
+    id: String(championship.id || createId("c")),
+    name,
+    date,
+    results,
+    createdAt: String(championship.createdAt || new Date().toISOString()),
+    updatedAt: String(championship.updatedAt || championship.createdAt || new Date().toISOString()),
+  };
+}
+
+function sanitizeStore(input) {
+  const raw = input && typeof input === "object" ? input : createEmptyData();
+  const rawPlayers = Array.isArray(raw.players) ? raw.players : [];
+  const players = rawPlayers.map(sanitizePlayer);
+  const playerIds = new Set(players.map((player) => player.id));
+  const rawChampionships = Array.isArray(raw.championships) ? raw.championships : [];
+  const championships = rawChampionships.map((championship, index) => sanitizeChampionship(championship, playerIds, index));
+  return { players, championships };
+}
+
+function parseDataContainer(rawText) {
+  const parsed = JSON.parse(rawText);
+  if (parsed && typeof parsed === "object" && parsed.data) {
+    return sanitizeStore(parsed.data);
+  }
+  return sanitizeStore(parsed);
+}
+
+function loadLegacyStore() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return { players: [], championships: [] };
+      return createEmptyData();
     }
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.players) || !Array.isArray(parsed.championships)) {
-      return { players: [], championships: [] };
-    }
-    return parsed;
+    return parseDataContainer(raw);
   } catch (error) {
-    return { players: [], championships: [] };
+    return createEmptyData();
   }
 }
 
+function writeLegacyStore(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeStore(data)));
+}
+
+function loadLegacyBackups() {
+  try {
+    const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((backup) => ({
+        id: String(backup.id || createId("b")),
+        label: String(backup.label || "Backup"),
+        createdAt: String(backup.createdAt || new Date().toISOString()),
+        data: sanitizeStore(backup.data),
+      }))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeLegacyBackups(backups) {
+  const sanitized = backups.slice(0, MAX_BACKUPS).map((backup) => ({
+    id: backup.id,
+    label: backup.label,
+    createdAt: backup.createdAt,
+    data: sanitizeStore(backup.data),
+  }));
+  localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(sanitized));
+}
+
+function canUseIndexedDb() {
+  return typeof window.indexedDB !== "undefined";
+}
+
+function openDatabase() {
+  if (!canUseIndexedDb()) {
+    return Promise.resolve(null);
+  }
+  if (dbPromise) {
+    return dbPromise;
+  }
+
+  dbPromise = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(DB_MAIN_STORE)) {
+        db.createObjectStore(DB_MAIN_STORE, { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains(DB_BACKUP_STORE)) {
+        db.createObjectStore(DB_BACKUP_STORE, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("No se pudo abrir IndexedDB."));
+  });
+
+  return dbPromise;
+}
+
+function idbRequestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Error de IndexedDB."));
+  });
+}
+
+async function idbGet(storeName, key) {
+  const db = await openDatabase();
+  if (!db) {
+    return null;
+  }
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+  return idbRequestToPromise(store.get(key));
+}
+
+async function idbPut(storeName, value) {
+  const db = await openDatabase();
+  if (!db) {
+    return null;
+  }
+  const tx = db.transaction(storeName, "readwrite");
+  const store = tx.objectStore(storeName);
+  const result = await idbRequestToPromise(store.put(value));
+  await new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("No se pudo guardar en IndexedDB."));
+    tx.onabort = () => reject(tx.error || new Error("Transaccion abortada en IndexedDB."));
+  });
+  return result;
+}
+
+async function idbDelete(storeName, key) {
+  const db = await openDatabase();
+  if (!db) {
+    return;
+  }
+  const tx = db.transaction(storeName, "readwrite");
+  tx.objectStore(storeName).delete(key);
+  await new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("No se pudo borrar en IndexedDB."));
+    tx.onabort = () => reject(tx.error || new Error("Transaccion abortada en IndexedDB."));
+  });
+}
+
+async function idbGetAll(storeName) {
+  const db = await openDatabase();
+  if (!db) {
+    return [];
+  }
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+  return idbRequestToPromise(store.getAll());
+}
+
+function updatePersistenceStatus(mode, detail) {
+  state.persistenceMode = mode;
+  refs.storageStatus.textContent = detail;
+  refs.storageStatus.classList.remove("status-ok", "status-warn", "status-error");
+  if (mode === "indexeddb" || mode === "mixed") {
+    refs.storageStatus.classList.add("status-ok");
+  } else if (mode === "localStorage") {
+    refs.storageStatus.classList.add("status-warn");
+  } else {
+    refs.storageStatus.classList.add("status-error");
+  }
+}
+
+async function persistStateSnapshot(data) {
+  const sanitized = sanitizeStore(data);
+  writeLegacyStore(sanitized);
+
+  if (!canUseIndexedDb()) {
+    updatePersistenceStatus("localStorage", "Guardado en localStorage");
+    return sanitized;
+  }
+
+  await idbPut(DB_MAIN_STORE, {
+    key: DB_STATE_KEY,
+    schemaVersion: APP_SCHEMA_VERSION,
+    savedAt: new Date().toISOString(),
+    data: sanitized,
+  });
+  updatePersistenceStatus("mixed", "Guardado en IndexedDB + localStorage");
+  return sanitized;
+}
+
+async function loadStore() {
+  const legacyData = loadLegacyStore();
+
+  if (!canUseIndexedDb()) {
+    updatePersistenceStatus("localStorage", "Usando localStorage");
+    return legacyData;
+  }
+
+  try {
+    const stored = await idbGet(DB_MAIN_STORE, DB_STATE_KEY);
+    if (stored && stored.data) {
+      updatePersistenceStatus("mixed", "Persistencia activa");
+      return sanitizeStore(stored.data);
+    }
+
+    await persistStateSnapshot(legacyData);
+    updatePersistenceStatus("mixed", "Migrado desde localStorage");
+    return legacyData;
+  } catch (error) {
+    updatePersistenceStatus("localStorage", "Fallback a localStorage");
+    return legacyData;
+  }
+}
+
+function createBackupRecord(data, label) {
+  return {
+    id: createId("b"),
+    label: String(label || "Backup manual"),
+    createdAt: new Date().toISOString(),
+    data: sanitizeStore(data),
+  };
+}
+
+async function loadBackups() {
+  const legacyBackups = loadLegacyBackups();
+  if (!canUseIndexedDb()) {
+    state.backups = legacyBackups;
+    return state.backups;
+  }
+
+  try {
+    const records = await idbGetAll(DB_BACKUP_STORE);
+    if (records.length) {
+      state.backups = records
+        .map((backup) => ({
+          id: String(backup.id),
+          label: String(backup.label || "Backup"),
+          createdAt: String(backup.createdAt || new Date().toISOString()),
+          data: sanitizeStore(backup.data),
+        }))
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      writeLegacyBackups(state.backups);
+      return state.backups;
+    }
+
+    state.backups = legacyBackups;
+    for (const backup of legacyBackups) {
+      await idbPut(DB_BACKUP_STORE, backup);
+    }
+    return state.backups;
+  } catch (error) {
+    state.backups = legacyBackups;
+    return state.backups;
+  }
+}
+
+async function saveBackups(backups) {
+  const trimmed = backups
+    .slice()
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, MAX_BACKUPS);
+
+  state.backups = trimmed;
+  writeLegacyBackups(trimmed);
+
+  if (!canUseIndexedDb()) {
+    return;
+  }
+
+  const existing = await idbGetAll(DB_BACKUP_STORE);
+  const keepIds = new Set(trimmed.map((backup) => backup.id));
+  for (const record of existing) {
+    if (!keepIds.has(record.id)) {
+      await idbDelete(DB_BACKUP_STORE, record.id);
+    }
+  }
+  for (const backup of trimmed) {
+    await idbPut(DB_BACKUP_STORE, backup);
+  }
+}
+
+async function createBackup(label, data = state.data) {
+  const backup = createBackupRecord(data, label);
+  await saveBackups([backup, ...state.backups]);
+  renderBackups();
+  return backup;
+}
+
 function saveStore(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return persistStateSnapshot(data).catch((error) => {
+    updatePersistenceStatus("error", "Error de guardado");
+    showToast(error.message || "No se pudieron guardar los datos.", true);
+  });
 }
 
 function getPlayerById(playerId) {
@@ -139,6 +514,17 @@ function formatSigned(value, decimals = 2) {
   const num = Number(value || 0);
   const fixed = num.toFixed(decimals);
   return num > 0 ? `+${fixed}` : fixed;
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value || "");
+  }
+  return new Intl.DateTimeFormat("es-UY", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function parseNumber(value) {
@@ -1081,11 +1467,155 @@ function renderChampionships() {
   }
 }
 
+function downloadJsonFile(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildExportPayload(data, source) {
+  return {
+    app: "Ranking de Billar",
+    schemaVersion: APP_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    source,
+    data: sanitizeStore(data),
+  };
+}
+
+function setDataPanelOpen(open) {
+  state.dataPanelOpen = Boolean(open);
+  refs.dataPanel.classList.toggle("hidden", !state.dataPanelOpen);
+  refs.toggleDataBtn.setAttribute("aria-expanded", state.dataPanelOpen ? "true" : "false");
+  refs.dataToggleLabel.textContent = state.dataPanelOpen ? "Ocultar" : "Desplegar";
+  document.querySelector(".data-card").classList.toggle("collapsed", !state.dataPanelOpen);
+}
+function renderBackups() {
+  refs.backupList.innerHTML = "";
+
+  if (!state.backups.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty empty-state";
+    empty.textContent = "Todavia no hay backups manuales. Puedes crear uno antes de importar o hacer cambios grandes.";
+    refs.backupList.appendChild(empty);
+    return;
+  }
+
+  state.backups.forEach((backup) => {
+    const item = document.createElement("article");
+    item.className = "backup-item";
+
+    const meta = document.createElement("div");
+    meta.className = "backup-meta";
+    meta.innerHTML = `
+      <strong>${backup.label}</strong>
+      <span>${formatDateTime(backup.createdAt)}</span>
+      <span>${backup.data.championships.length} campeonatos | ${backup.data.players.length} jugadores</span>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "backup-actions";
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "btn btn-secondary btn-sm";
+    restoreBtn.textContent = "Restaurar";
+    restoreBtn.addEventListener("click", async () => {
+      const ok = window.confirm(`Se restaurara el backup "${backup.label}". Antes se guardara una copia del estado actual. Continuar?`);
+      if (!ok) {
+        return;
+      }
+      try {
+        await createBackup("Antes de restaurar", state.data);
+        state.data = cloneData(backup.data);
+        await persistStateSnapshot(state.data);
+        resetForm();
+        renderAll();
+        showToast("Backup restaurado.");
+      } catch (error) {
+        showToast(error.message || "No se pudo restaurar el backup.", true);
+      }
+    });
+
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "btn btn-ghost btn-sm";
+    exportBtn.textContent = "Exportar";
+    exportBtn.addEventListener("click", () => {
+      downloadJsonFile(buildExportPayload(backup.data, `backup:${backup.label}`), `ranking-backup-${backup.id}.json`);
+    });
+
+    actions.appendChild(restoreBtn);
+    actions.appendChild(exportBtn);
+    item.appendChild(meta);
+    item.appendChild(actions);
+    refs.backupList.appendChild(item);
+  });
+}
+
 function renderAll() {
   renderRanking();
   renderPlayerDetail();
   renderNameEditor();
   renderChampionships();
+  renderBackups();
+}
+
+async function handleCreateBackup() {
+  try {
+    await createBackup("Backup manual", state.data);
+    showToast("Backup creado.");
+  } catch (error) {
+    showToast(error.message || "No se pudo crear el backup.", true);
+  }
+}
+
+function handleExport() {
+  try {
+    const payload = buildExportPayload(state.data, "current-state");
+    const datePart = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    downloadJsonFile(payload, `ranking-billar-${datePart}.json`);
+    showToast("JSON exportado.");
+  } catch (error) {
+    showToast(error.message || "No se pudo exportar el JSON.", true);
+  }
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
+    reader.readAsText(file, "utf-8");
+  });
+}
+
+async function handleImportFile(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await readFileAsText(file);
+    const importedData = parseDataContainer(text);
+    await createBackup("Antes de importar", state.data);
+    state.data = importedData;
+    await persistStateSnapshot(state.data);
+    await createBackup(`Importado: ${file.name}`, state.data);
+    resetForm();
+    renderAll();
+    showToast("JSON importado correctamente.");
+  } catch (error) {
+    showToast(error.message || "No se pudo importar el JSON.", true);
+  } finally {
+    refs.importInput.value = "";
+  }
 }
 
 function bindUIEvents() {
@@ -1106,6 +1636,23 @@ function bindUIEvents() {
   refs.cancelEditBtn.addEventListener("click", () => {
     resetForm();
     showToast("Edicion cancelada.");
+  });
+
+  refs.toggleDataBtn.addEventListener("click", () => {
+    setDataPanelOpen(!state.dataPanelOpen);
+  });
+
+  refs.backupBtn.addEventListener("click", () => {
+    handleCreateBackup();
+  });
+
+  refs.exportBtn.addEventListener("click", () => {
+    handleExport();
+  });
+
+  refs.importInput.addEventListener("change", (event) => {
+    const file = event.target.files && event.target.files[0];
+    handleImportFile(file);
   });
 
   refs.form.addEventListener("submit", (event) => {
@@ -1133,8 +1680,17 @@ function bindUIEvents() {
   });
 }
 
-function init() {
-  state.data = loadStore();
+async function init() {
+  try {
+    state.data = await loadStore();
+    await loadBackups();
+    state.persistenceReady = true;
+  } catch (error) {
+    state.data = loadLegacyStore();
+    state.backups = loadLegacyBackups();
+    updatePersistenceStatus("localStorage", "Usando localStorage");
+  }
+
   bindUIEvents();
   setFormCollapsed(false);
   resetForm();
@@ -1142,3 +1698,12 @@ function init() {
 }
 
 init();
+
+
+
+
+
+
+
+
+

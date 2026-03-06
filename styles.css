@@ -110,6 +110,38 @@ body {
   grid-column: 1 / -1;
 }
 
+.data-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.data-toggle span:first-child {
+  font-family: "Orbitron", "Lucida Sans", sans-serif;
+  letter-spacing: 0.04em;
+  font-size: 1.05rem;
+}
+
+.data-panel {
+  margin-top: 0.85rem;
+}
+
+.data-card.collapsed {
+  padding-bottom: 1rem;
+}
+.data-card {
+  grid-column: 1 / -1;
+}
+
 h2,
 h3 {
   margin: 0 0 0.7rem;
@@ -438,6 +470,76 @@ input:focus-visible,
   min-height: 2rem;
 }
 
+.file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.data-hint {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.status-ok {
+  border-color: rgba(94, 242, 185, 0.8);
+  color: #beffe5;
+}
+
+.status-warn {
+  border-color: rgba(255, 207, 109, 0.8);
+  color: #ffe5a0;
+}
+
+.status-error {
+  border-color: rgba(255, 79, 131, 0.8);
+  color: #ffd1df;
+}
+
+.backup-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.backup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid rgba(74, 224, 255, 0.28);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(4, 15, 33, 0.65);
+}
+
+.backup-meta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.backup-meta strong {
+  color: #c9f4ff;
+}
+
+.backup-meta span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .form-card.collapsed #championship-form {
   display: none;
 }
@@ -755,6 +857,7 @@ input:focus-visible,
     grid-template-columns: 1fr;
   }
 
+  .data-card,
   .form-card,
   .ranking-card,
   .history-card {
@@ -843,7 +946,23 @@ input:focus-visible,
     grid-template-columns: 1fr;
   }
 
+  .backup-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .backup-actions {
+    justify-content: flex-start;
+  }
+
   .topbar {
     padding-top: 1rem;
   }
 }
+
+
+
+
+
+
+
