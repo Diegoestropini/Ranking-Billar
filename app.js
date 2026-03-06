@@ -721,7 +721,7 @@ function renderPlayerDetail() {
 
   const timeline = getPlayerTimeline(state.selectedPlayerId);
   const participations = [...timeline].reverse();
-  const visibleParticipations = state.playerParticipationExpanded ? participations : participations.slice(0, 3);
+  const visibleParticipations = state.playerParticipationExpanded ? participations : participations.slice(0, 5);
 
   const title = document.createElement("h3");
   title.className = "player-detail-title";
@@ -843,7 +843,7 @@ function renderPlayerDetail() {
   });
 
   refs.playerDetail.appendChild(list);
-  if (participations.length > 3) {
+  if (participations.length > 5) {
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
     toggleBtn.className = "player-detail-toggle";
