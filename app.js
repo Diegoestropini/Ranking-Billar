@@ -17,6 +17,8 @@ const state = {
   nameEditorOpen: false,
   playerTrendLimit: 5,
   playerMovingAvgWindow: 3,
+  playerParticipationExpanded: false,
+  championshipHistoryExpanded: false,
 };
 
 const refs = {
@@ -544,6 +546,7 @@ function renderRanking() {
 
   if (!ranking.some((entry) => entry.playerId === state.selectedPlayerId)) {
     state.selectedPlayerId = ranking[0].playerId;
+    state.playerParticipationExpanded = false;
   }
 
   ranking.forEach((entry, idx) => {
@@ -584,7 +587,11 @@ function renderRanking() {
     playerBtn.className = "player-name-btn";
     playerBtn.textContent = entry.name;
     playerBtn.addEventListener("click", () => {
+      const changedPlayer = state.selectedPlayerId !== entry.playerId;
       state.selectedPlayerId = entry.playerId;
+      if (changedPlayer) {
+        state.playerParticipationExpanded = false;
+      }
       renderRanking();
       renderPlayerDetail();
       refs.playerDetail.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -714,6 +721,7 @@ function renderPlayerDetail() {
 
   const timeline = getPlayerTimeline(state.selectedPlayerId);
   const participations = [...timeline].reverse();
+  const visibleParticipations = state.playerParticipationExpanded ? participations : participations.slice(0, 3);
 
   const title = document.createElement("h3");
   title.className = "player-detail-title";
@@ -824,10 +832,10 @@ function renderPlayerDetail() {
 
   const participationTitle = document.createElement("h4");
   participationTitle.className = "player-section-title player-section-participations";
-  participationTitle.textContent = "Participaciones";
+  participationTitle.textContent = `Participaciones (${participations.length})`;
   refs.playerDetail.appendChild(participationTitle);
 
-  participations.forEach((item) => {
+  visibleParticipations.forEach((item) => {
     const row = document.createElement("div");
     row.className = "player-detail-item player-detail-item-participation";
     row.textContent = `${item.date} | ${item.championshipName} | Puntos: ${formatNum(item.points, 2)} | Saldo: ${formatNum(item.saldo, 2)}`;
@@ -835,6 +843,17 @@ function renderPlayerDetail() {
   });
 
   refs.playerDetail.appendChild(list);
+  if (participations.length > 3) {
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "player-detail-toggle";
+    toggleBtn.textContent = state.playerParticipationExpanded ? "Mostrar menos" : "Mostrar mas";
+    toggleBtn.addEventListener("click", () => {
+      state.playerParticipationExpanded = !state.playerParticipationExpanded;
+      renderPlayerDetail();
+    });
+    refs.playerDetail.appendChild(toggleBtn);
+  }
   refs.playerDetail.classList.remove("hidden");
 }
 
@@ -980,6 +999,7 @@ function sortChampionshipsForView(championships) {
 function renderChampionships() {
   refs.championshipList.innerHTML = "";
   const list = sortChampionshipsForView(state.data.championships);
+  const visibleChampionships = state.championshipHistoryExpanded ? list : list.slice(0, 3);
   const historyColors = [
     "#4ae0ff",
     "#5ef2b9",
@@ -999,7 +1019,7 @@ function renderChampionships() {
     return;
   }
 
-  list.forEach((championship, index) => {
+  visibleChampionships.forEach((championship, index) => {
     const item = document.createElement("article");
     item.className = "championship-item";
     item.style.setProperty("--history-color", historyColors[index % historyColors.length]);
@@ -1047,6 +1067,18 @@ function renderChampionships() {
     item.appendChild(actions);
     refs.championshipList.appendChild(item);
   });
+
+  if (list.length > 3) {
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "history-toggle";
+    toggleBtn.textContent = state.championshipHistoryExpanded ? "Mostrar menos" : "Mostrar mas";
+    toggleBtn.addEventListener("click", () => {
+      state.championshipHistoryExpanded = !state.championshipHistoryExpanded;
+      renderChampionships();
+    });
+    refs.championshipList.appendChild(toggleBtn);
+  }
 }
 
 function renderAll() {

@@ -533,6 +533,25 @@ input:focus-visible,
   gap: 0.5rem;
 }
 
+.history-toggle {
+  width: 100%;
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  background: linear-gradient(180deg, rgba(74, 224, 255, 0.16), rgba(4, 15, 33, 0.92));
+  color: #c6f3ff;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.history-toggle:hover {
+  border-color: rgba(74, 224, 255, 0.72);
+  box-shadow: 0 -8px 18px rgba(74, 224, 255, 0.12);
+}
+
 .player-detail,
 .name-editor {
   margin-top: 0.8rem;
@@ -634,6 +653,27 @@ input:focus-visible,
   background: rgba(28, 19, 3, 0.9);
   color: #ffcf6d;
 }
+
+.player-detail-toggle {
+  width: 100%;
+  margin-top: 0.55rem;
+  border: 1px solid rgba(255, 207, 109, 0.4);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  background: linear-gradient(180deg, rgba(255, 207, 109, 0.18), rgba(28, 19, 3, 0.92));
+  color: #ffe0a1;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.player-detail-toggle:hover {
+  border-color: rgba(255, 207, 109, 0.72);
+  box-shadow: 0 -8px 18px rgba(255, 207, 109, 0.12);
+}
+
 
 .name-editor-head {
   display: flex;
