@@ -60,6 +60,7 @@ const refs = {
   exportBtn: document.getElementById("export-btn"),
   importInput: document.getElementById("import-input"),
   backupList: document.getElementById("backup-list"),
+  floatingExpandFormBtn: document.getElementById("floating-expand-form-btn"),
 };
 
 let dbPromise = null;
@@ -840,6 +841,7 @@ function setFormCollapsed(collapsed) {
   refs.layout.classList.toggle("form-collapsed", collapsed);
   refs.toggleFormBtn.textContent = collapsed ? "Desplegar" : "Plegar";
   refs.toggleFormBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  refs.floatingExpandFormBtn.classList.toggle("hidden", !collapsed);
 }
 
 function fillFormForEdit(championship) {
@@ -1649,6 +1651,11 @@ function bindUIEvents() {
     setFormCollapsed(!formCard.classList.contains("collapsed"));
   });
 
+  refs.floatingExpandFormBtn.addEventListener("click", () => {
+    setFormCollapsed(false);
+    document.querySelector(".form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   refs.toggleNameEditorBtn.addEventListener("click", () => {
     state.nameEditorOpen = !state.nameEditorOpen;
     renderNameEditor();
@@ -1741,5 +1748,7 @@ async function init() {
 }
 
 init();
+
+
 
 
