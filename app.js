@@ -1705,22 +1705,41 @@ function bindUIEvents() {
   });
 }
 
+function isSameDataSnapshot(a, b) {
+  return JSON.stringify(sanitizeStore(a)) === JSON.stringify(sanitizeStore(b));
+}
+
 async function init() {
-  try {
-    state.data = await loadStore();
-    await loadBackups();
-    state.persistenceReady = true;
-  } catch (error) {
-    state.data = loadLegacyStore();
-    state.backups = loadLegacyBackups();
-    updatePersistenceStatus("localStorage", "Usando localStorage");
-  }
+  state.data = loadLegacyStore();
+  state.backups = loadLegacyBackups();
+  updatePersistenceStatus("localStorage", "Cargando persistencia...");
 
   bindUIEvents();
   setFormCollapsed(false);
   resetForm();
   renderAll();
+
+  try {
+    const persistedData = await loadStore();
+    const persistedBackups = await loadBackups();
+    const shouldRenderData = !isSameDataSnapshot(state.data, persistedData);
+    const shouldRenderBackups = JSON.stringify(state.backups) !== JSON.stringify(persistedBackups);
+
+    state.data = persistedData;
+    state.backups = persistedBackups;
+    state.persistenceReady = true;
+
+    if (shouldRenderData || shouldRenderBackups) {
+      renderAll();
+    } else {
+      renderBackups();
+    }
+  } catch (error) {
+    state.persistenceReady = true;
+    updatePersistenceStatus("localStorage", "Usando localStorage");
+  }
 }
 
 init();
+
 
