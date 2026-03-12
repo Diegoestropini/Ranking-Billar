@@ -998,11 +998,11 @@ function renderRanking() {
     ratingTd.textContent = formatNum(entry.rating, 3);
 
     const championshipsTd = document.createElement("td");
-    championshipsTd.setAttribute("data-label", "Campeonatos");
+    championshipsTd.setAttribute("data-label", "Participaciones");
     championshipsTd.textContent = String(entry.championships);
 
     const championshipsWonTd = document.createElement("td");
-    championshipsWonTd.setAttribute("data-label", "Cantidad de campeonatos");
+    championshipsWonTd.setAttribute("data-label", "Campeonatos ganados");
     championshipsWonTd.textContent = String(entry.championshipsWon);
     championshipsWonTd.classList.add("championship-wins");
     if (entry.championshipsWon > 0) {
@@ -1748,7 +1748,3 @@ async function init() {
 }
 
 init();
-
-
-
-
