@@ -27,6 +27,7 @@ const state = {
   playerTrendLimit: 5,
   playerMovingAvgWindow: 3,
   playerParticipationExpanded: false,
+  playerVisualTimelineExpanded: false,
   championshipHistoryExpanded: false,
   persistenceMode: "localStorage",
   persistenceReady: false,
@@ -942,6 +943,7 @@ function renderRanking() {
   if (!ranking.some((entry) => entry.playerId === state.selectedPlayerId)) {
     state.selectedPlayerId = ranking[0].playerId;
     state.playerParticipationExpanded = false;
+    state.playerVisualTimelineExpanded = false;
   }
 
   ranking.forEach((entry, idx) => {
@@ -986,6 +988,7 @@ function renderRanking() {
       state.selectedPlayerId = entry.playerId;
       if (changedPlayer) {
         state.playerParticipationExpanded = false;
+        state.playerVisualTimelineExpanded = false;
       }
       renderRanking();
       renderPlayerDetail();
@@ -1049,6 +1052,85 @@ function sortChampionshipsAscending(championships) {
   });
 }
 
+function getChampionshipPlacement(championship, playerId) {
+  const ordered = [...championship.results].sort((a, b) => {
+    const pointsDiff = (Number(b.points) || 0) - (Number(a.points) || 0);
+    if (pointsDiff !== 0) {
+      return pointsDiff;
+    }
+
+    const saldoDiff = (Number(b.saldo) || 0) - (Number(a.saldo) || 0);
+    if (saldoDiff !== 0) {
+      return saldoDiff;
+    }
+
+    const playerA = getPlayerById(a.playerId);
+    const playerB = getPlayerById(b.playerId);
+    return String(playerA?.name || "").localeCompare(String(playerB?.name || ""), "es");
+  });
+
+  const position = ordered.findIndex((item) => item.playerId === playerId);
+  if (position === -1) {
+    return null;
+  }
+
+  return {
+    position: position + 1,
+    totalParticipants: ordered.length,
+  };
+}
+
+function getPerformanceLabel(position, totalParticipants) {
+  if (position === 1) {
+    return "Excelente";
+  }
+  if (position >= Math.max(2, totalParticipants - 1)) {
+    return "Muy insuficiente";
+  }
+  if (position >= 2 && position <= 4) {
+    return "Muy bueno";
+  }
+  if (position >= 5 && position <= 8) {
+    return "Bueno";
+  }
+  if (position >= 9) {
+    return "Insuficiente";
+  }
+  return "Bueno";
+}
+
+function getPerformanceTone(position, totalParticipants) {
+  if (position === 1) {
+    return "strong";
+  }
+  if (position >= Math.max(2, totalParticipants - 1)) {
+    return "very-low";
+  }
+  if (position >= 2 && position <= 4) {
+    return "strong";
+  }
+  if (position >= 5 && position <= 8) {
+    return "mid";
+  }
+  if (position >= 9) {
+    return "low";
+  }
+  return "low";
+}
+
+function getPlacementMedal(position) {
+  if (position === 1) {
+    return "🥇";
+  }
+  if (position === 2) {
+    return "🥈";
+  }
+  if (position === 3) {
+    return "🥉";
+  }
+  return "";
+}
+
 function getPlayerTimeline(playerId) {
   const timeline = [];
   const baselineScore = computeGlobalBaselineScore(state.data.championships);
@@ -1057,6 +1139,7 @@ function getPlayerTimeline(playerId) {
   let pointsTotal = 0;
   let saldoTotalForRating = 0;
   let relativeTotal = 0;
+  let previousRating = null;
 
   sortChampionshipsAscending(state.data.championships).forEach((championship) => {
     const result = championship.results.find((row) => row.playerId === playerId);
@@ -1076,6 +1159,12 @@ function getPlayerTimeline(playerId) {
     const relativeAdjustment = relativeTotal / championships;
     const adjustedRating = rawRating + relativeAdjustment;
     const rating = applyRegressionToMean(adjustedRating, championships, baselineScore);
+    const placement = getChampionshipPlacement(championship, playerId) || {
+      position: championship.results.length,
+      totalParticipants: championship.results.length,
+    };
+    const ratingDelta = previousRating === null ? 0 : rating - previousRating;
+    previousRating = rating;
 
     timeline.push({
       championshipId: championship.id,
@@ -1085,6 +1174,13 @@ function getPlayerTimeline(playerId) {
       saldo: saldoRaw,
       tournamentScore,
       rating,
+      ratingDelta,
+      position: placement.position,
+      totalParticipants: placement.totalParticipants,
+      performanceLabel: getPerformanceLabel(placement.position, placement.totalParticipants),
+      performanceTone: getPerformanceTone(placement.position, placement.totalParticipants),
+      placementMedal: getPlacementMedal(placement.position),
+      wonChampionship: placement.position === 1,
     });
   });
 
@@ -1099,6 +1195,35 @@ function computeMovingAverage(series, windowSize) {
     const total = slice.reduce((sum, item) => sum + item, 0);
     return total / slice.length;
   });
+}
+
+function getNormalizedMetric(value, min, max) {
+  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+    return 1;
+  }
+  return (value - min) / (max - min);
+}
+
+function getRatingDeltaMeta(delta) {
+  if (delta > 0) {
+    return {
+      symbol: "▲",
+      className: "is-positive",
+      text: `+${formatNum(delta, 3)}`,
+    };
+  }
+  if (delta < 0) {
+    return {
+      symbol: "▼",
+      className: "is-negative",
+      text: formatNum(delta, 3),
+    };
+  }
+  return {
+    symbol: "•",
+    className: "is-neutral",
+    text: formatNum(delta, 3),
+  };
 }
 
 function renderPlayerDetail() {
@@ -1116,6 +1241,7 @@ function renderPlayerDetail() {
 
   const timeline = getPlayerTimeline(state.selectedPlayerId);
   const participations = [...timeline].reverse();
+  const visualTimelineItems = state.playerVisualTimelineExpanded ? participations : participations.slice(0, 2);
   const visibleParticipations = state.playerParticipationExpanded ? participations : participations.slice(0, 5);
 
   const title = document.createElement("h3");
@@ -1165,6 +1291,108 @@ function renderPlayerDetail() {
   summary.appendChild(bestItem);
   summary.appendChild(worstItem);
   refs.playerDetail.appendChild(summary);
+
+  const timelineTitle = document.createElement("h4");
+  timelineTitle.className = "player-section-title player-section-timeline";
+  timelineTitle.textContent = "Linea de tiempo competitiva";
+  refs.playerDetail.appendChild(timelineTitle);
+
+  const timelineVisual = document.createElement("div");
+  timelineVisual.className = "player-visual-timeline";
+
+  const ratingValues = timeline.map((item) => item.rating);
+  const scoreValues = timeline.map((item) => item.tournamentScore);
+  const minRating = Math.min(...ratingValues);
+  const maxRating = Math.max(...ratingValues);
+  const minScore = Math.min(...scoreValues);
+  const maxScore = Math.max(...scoreValues);
+
+  visualTimelineItems.forEach((item) => {
+    const deltaMeta = getRatingDeltaMeta(item.ratingDelta);
+    const entry = document.createElement("article");
+    entry.className = `player-timeline-entry tone-${item.performanceTone}`;
+
+    const marker = document.createElement("div");
+    marker.className = "player-timeline-marker";
+    marker.textContent = item.placementMedal || String(item.position);
+
+    const content = document.createElement("div");
+    content.className = "player-timeline-content";
+
+    const head = document.createElement("div");
+    head.className = "player-timeline-head";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "player-timeline-title-wrap";
+
+    const itemTitle = document.createElement("strong");
+    itemTitle.className = "player-timeline-title";
+    itemTitle.textContent = item.championshipName;
+
+    const itemDate = document.createElement("span");
+    itemDate.className = "player-timeline-date";
+    itemDate.textContent = item.date;
+
+    titleWrap.appendChild(itemTitle);
+    titleWrap.appendChild(itemDate);
+
+    const badge = document.createElement("span");
+    badge.className = `player-timeline-badge tone-${item.performanceTone}`;
+    badge.textContent = `${item.performanceLabel} | ${item.position}/${item.totalParticipants}`;
+
+    head.appendChild(titleWrap);
+    head.appendChild(badge);
+
+    const metrics = document.createElement("div");
+    metrics.className = "player-timeline-metrics";
+
+    const ratingMetric = document.createElement("div");
+    ratingMetric.className = "player-timeline-metric";
+    ratingMetric.innerHTML = `<span>Rating</span><strong>${formatNum(item.rating, 3)}</strong><small class="${deltaMeta.className}">${deltaMeta.symbol} ${deltaMeta.text} vs. torneo anterior</small>`;
+
+    const scoreMetric = document.createElement("div");
+    scoreMetric.className = "player-timeline-metric";
+    scoreMetric.innerHTML = `<span>Rendimiento</span><strong>${formatNum(item.tournamentScore, 2)}</strong><small>Puntos ${formatNum(item.points, 2)} | Saldo ${formatNum(item.saldo, 2)}</small>`;
+
+    metrics.appendChild(ratingMetric);
+    metrics.appendChild(scoreMetric);
+
+    const bars = document.createElement("div");
+    bars.className = "player-timeline-bars";
+
+    const ratingBar = document.createElement("div");
+    ratingBar.className = "player-timeline-bar";
+    ratingBar.innerHTML = `<label>Momento de rating</label><div><span style="width:${Math.max(10, getNormalizedMetric(item.rating, minRating, maxRating) * 100)}%"></span></div>`;
+
+    const scoreBar = document.createElement("div");
+    scoreBar.className = "player-timeline-bar";
+    scoreBar.innerHTML = `<label>Como le fue en ese campeonato</label><div><span style="width:${Math.max(10, getNormalizedMetric(item.tournamentScore, minScore, maxScore) * 100)}%"></span></div>`;
+
+    bars.appendChild(ratingBar);
+    bars.appendChild(scoreBar);
+
+    content.appendChild(head);
+    content.appendChild(metrics);
+    content.appendChild(bars);
+
+    entry.appendChild(marker);
+    entry.appendChild(content);
+    timelineVisual.appendChild(entry);
+  });
+
+  refs.playerDetail.appendChild(timelineVisual);
+
+  if (participations.length > 2) {
+    const timelineToggleBtn = document.createElement("button");
+    timelineToggleBtn.type = "button";
+    timelineToggleBtn.className = "player-detail-toggle";
+    timelineToggleBtn.textContent = state.playerVisualTimelineExpanded ? "Mostrar menos" : "Mostrar mas";
+    timelineToggleBtn.addEventListener("click", () => {
+      state.playerVisualTimelineExpanded = !state.playerVisualTimelineExpanded;
+      renderPlayerDetail();
+    });
+    refs.playerDetail.appendChild(timelineToggleBtn);
+  }
 
   const controls = document.createElement("div");
   controls.className = "player-trend-controls";
