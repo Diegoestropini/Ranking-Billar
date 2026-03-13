@@ -98,7 +98,10 @@
       <section class="card ranking-card">
         <div class="card-title-row">
           <h2>Ranking Global</h2>
-          <button id="toggle-name-editor-btn" type="button" class="btn btn-ghost btn-sm">Editar nombres</button>
+          <div class="title-actions">
+            <button id="toggle-medals-btn" type="button" class="btn btn-ghost btn-sm">Medallas</button>
+            <button id="toggle-name-editor-btn" type="button" class="btn btn-ghost btn-sm">Editar nombres</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="data-table" id="ranking-table">
@@ -117,6 +120,7 @@
           </table>
         </div>
         <div id="player-detail" class="player-detail hidden"></div>
+        <div id="medals-panel" class="medals-panel hidden"></div>
         <div id="name-editor" class="name-editor hidden"></div>
       </section>
 

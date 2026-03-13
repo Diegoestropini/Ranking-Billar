@@ -24,6 +24,7 @@ const state = {
   editingChampionshipId: null,
   selectedPlayerId: null,
   nameEditorOpen: false,
+  medalsPanelOpen: false,
   playerTrendLimit: 5,
   playerMovingAvgWindow: 3,
   playerParticipationExpanded: false,
@@ -47,9 +48,11 @@ const refs = {
   saveBtn: document.getElementById("save-btn"),
   cancelEditBtn: document.getElementById("cancel-edit-btn"),
   toggleFormBtn: document.getElementById("toggle-form-btn"),
+  toggleMedalsBtn: document.getElementById("toggle-medals-btn"),
   toggleNameEditorBtn: document.getElementById("toggle-name-editor-btn"),
   rankingBody: document.getElementById("ranking-body"),
   playerDetail: document.getElementById("player-detail"),
+  medalsPanel: document.getElementById("medals-panel"),
   nameEditor: document.getElementById("name-editor"),
   championshipList: document.getElementById("championship-list"),
   toast: document.getElementById("toast"),
@@ -1630,6 +1633,160 @@ function sortChampionshipsForView(championships) {
   });
 }
 
+function computeMedalStandings() {
+  const medalMap = new Map();
+
+  state.data.players.forEach((player) => {
+    medalMap.set(player.id, {
+      playerId: player.id,
+      name: player.name,
+      gold: 0,
+      silver: 0,
+      bronze: 0,
+      total: 0,
+    });
+  });
+
+  state.data.championships.forEach((championship) => {
+    const ordered = [...championship.results].sort((a, b) => {
+      const pointsDiff = (Number(b.points) || 0) - (Number(a.points) || 0);
+      if (pointsDiff !== 0) {
+        return pointsDiff;
+      }
+
+      const saldoDiff = (Number(b.saldo) || 0) - (Number(a.saldo) || 0);
+      if (saldoDiff !== 0) {
+        return saldoDiff;
+      }
+
+      const playerA = getPlayerById(a.playerId);
+      const playerB = getPlayerById(b.playerId);
+      return String(playerA?.name || "").localeCompare(String(playerB?.name || ""), "es");
+    });
+
+    ordered.slice(0, 3).forEach((result, index) => {
+      const item = medalMap.get(result.playerId);
+      if (!item) {
+        return;
+      }
+
+      if (index === 0) {
+        item.gold += 1;
+      } else if (index === 1) {
+        item.silver += 1;
+      } else if (index === 2) {
+        item.bronze += 1;
+      }
+
+      item.total += 1;
+    });
+  });
+
+  return [...medalMap.values()]
+    .filter((item) => item.total > 0)
+    .sort((a, b) => {
+      if (b.gold !== a.gold) {
+        return b.gold - a.gold;
+      }
+      if (b.silver !== a.silver) {
+        return b.silver - a.silver;
+      }
+      if (b.bronze !== a.bronze) {
+        return b.bronze - a.bronze;
+      }
+      return a.name.localeCompare(b.name, "es");
+    });
+}
+
+function getMedalCategoryLeader(entries, key) {
+  const maxValue = entries.reduce((max, item) => Math.max(max, item[key]), 0);
+  if (maxValue <= 0) {
+    return null;
+  }
+
+  return {
+    value: maxValue,
+    names: entries.filter((item) => item[key] === maxValue).map((item) => item.name),
+  };
+}
+
+function renderMedalsPanel() {
+  refs.medalsPanel.innerHTML = "";
+
+  if (!state.medalsPanelOpen) {
+    refs.medalsPanel.classList.add("hidden");
+    refs.toggleMedalsBtn.textContent = "Medallas";
+    return;
+  }
+
+  refs.medalsPanel.classList.remove("hidden");
+  refs.toggleMedalsBtn.textContent = "Cerrar medallas";
+
+  const title = document.createElement("h3");
+  title.className = "medals-panel-title";
+  title.textContent = "Medallero";
+  refs.medalsPanel.appendChild(title);
+
+  const standings = computeMedalStandings();
+  if (!standings.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty empty-state";
+    empty.textContent = "Todavia no hay suficientes campeonatos para mostrar medallas.";
+    refs.medalsPanel.appendChild(empty);
+    return;
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "medals-summary-grid";
+
+  [
+    { icon: "🥇", label: "Mas oros", key: "gold" },
+    { icon: "🥈", label: "Mas platas", key: "silver" },
+    { icon: "🥉", label: "Mas bronces", key: "bronze" },
+    { icon: "🏅", label: "Medallas totales", key: "total" },
+  ].forEach((category) => {
+    const leader = getMedalCategoryLeader(standings, category.key);
+    const card = document.createElement("article");
+    card.className = "medal-summary-card";
+
+    const cardLabel = document.createElement("span");
+    cardLabel.className = "medal-summary-label";
+    cardLabel.textContent = `${category.icon} ${category.label}`;
+
+    const cardNames = document.createElement("strong");
+    cardNames.className = "medal-summary-names";
+    cardNames.textContent = leader ? leader.names.join(" / ") : "Sin lider";
+
+    const cardValue = document.createElement("small");
+    cardValue.className = "medal-summary-value";
+    cardValue.textContent = leader ? `${leader.value} ${leader.value === 1 ? "medalla" : "medallas"}` : "0 medallas";
+
+    card.appendChild(cardLabel);
+    card.appendChild(cardNames);
+    card.appendChild(cardValue);
+    summary.appendChild(card);
+  });
+
+  refs.medalsPanel.appendChild(summary);
+
+  const tableTitle = document.createElement("h4");
+  tableTitle.className = "player-section-title medals-table-title";
+  tableTitle.textContent = "Medallero general";
+  refs.medalsPanel.appendChild(tableTitle);
+
+  const list = document.createElement("div");
+  list.className = "medals-list";
+
+  standings.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "medals-row";
+    row.innerHTML = `<strong>${entry.name}</strong><span>🥇 ${entry.gold}</span><span>🥈 ${entry.silver}</span><span>🥉 ${entry.bronze}</span><span>🏅 ${entry.total}</span>`;
+    list.appendChild(row);
+  });
+
+  refs.medalsPanel.appendChild(list);
+}
+
 function renderChampionships() {
   refs.championshipList.innerHTML = "";
   const list = sortChampionshipsForView(state.data.championships);
@@ -1817,6 +1974,7 @@ function renderBackups() {
 function renderAll() {
   renderRanking();
   renderPlayerDetail();
+  renderMedalsPanel();
   renderNameEditor();
   renderChampionships();
   renderBackups();
@@ -1887,6 +2045,11 @@ function bindUIEvents() {
   refs.toggleNameEditorBtn.addEventListener("click", () => {
     state.nameEditorOpen = !state.nameEditorOpen;
     renderNameEditor();
+  });
+
+  refs.toggleMedalsBtn.addEventListener("click", () => {
+    state.medalsPanelOpen = !state.medalsPanelOpen;
+    renderMedalsPanel();
   });
 
   refs.addRowBtn.addEventListener("click", () => {
