@@ -35,6 +35,7 @@ const state = {
   playerMovingAvgWindow: 3,
   playerParticipationExpanded: false,
   playerVisualTimelineExpanded: false,
+  playerHistoricalComparisonOpen: false,
   championshipHistoryExpanded: false,
   persistenceMode: "localStorage",
   persistenceReady: false,
@@ -1103,6 +1104,7 @@ function renderRanking() {
       if (changedPlayer) {
         state.playerParticipationExpanded = false;
         state.playerVisualTimelineExpanded = false;
+        state.playerHistoricalComparisonOpen = false;
       }
       renderRanking();
       renderPlayerDetail();
@@ -1335,6 +1337,29 @@ function getRatingDeltaMeta(delta) {
   };
 }
 
+function getHistoricalComparisonMeta(delta) {
+  const threshold = 0.35;
+  if (delta > threshold) {
+    return {
+      label: "Por encima de su media",
+      className: "is-positive",
+      shortLabel: "Arriba",
+    };
+  }
+  if (delta < -threshold) {
+    return {
+      label: "Por debajo de su media",
+      className: "is-negative",
+      shortLabel: "Abajo",
+    };
+  }
+  return {
+    label: "En linea con su media",
+    className: "is-neutral",
+    shortLabel: "Igual",
+  };
+}
+
 function renderPlayerDetail() {
   refs.playerDetail.innerHTML = "";
   if (!state.selectedPlayerId) {
@@ -1352,6 +1377,19 @@ function renderPlayerDetail() {
   const participations = [...timeline].reverse();
   const visualTimelineItems = state.playerVisualTimelineExpanded ? participations : participations.slice(0, 2);
   const visibleParticipations = state.playerParticipationExpanded ? participations : participations.slice(0, 5);
+  const historicalAverage = timeline.length
+    ? timeline.reduce((sum, item) => sum + item.tournamentScore, 0) / timeline.length
+    : 0;
+  const historicalComparisonItems = [...timeline]
+    .map((item) => {
+      const deltaVsAverage = item.tournamentScore - historicalAverage;
+      return {
+        ...item,
+        deltaVsAverage,
+        comparisonMeta: getHistoricalComparisonMeta(deltaVsAverage),
+      };
+    })
+    .reverse();
 
   const title = document.createElement("h3");
   title.className = "player-detail-title";
@@ -1514,6 +1552,101 @@ function renderPlayerDetail() {
       renderPlayerDetail();
     });
     refs.playerDetail.appendChild(timelineToggleBtn);
+  }
+
+  const historicalToggleBtn = document.createElement("button");
+  historicalToggleBtn.type = "button";
+  historicalToggleBtn.className = "player-detail-toggle player-detail-toggle-compare";
+  historicalToggleBtn.textContent = state.playerHistoricalComparisonOpen
+    ? "Ocultar comparacion con su promedio"
+    : "Ver comparacion con su promedio";
+  historicalToggleBtn.addEventListener("click", () => {
+    state.playerHistoricalComparisonOpen = !state.playerHistoricalComparisonOpen;
+    renderPlayerDetail();
+  });
+  refs.playerDetail.appendChild(historicalToggleBtn);
+
+  if (state.playerHistoricalComparisonOpen) {
+    const comparisonTitle = document.createElement("h4");
+    comparisonTitle.className = "player-section-title player-section-comparison";
+    comparisonTitle.textContent = "Comparacion contra su promedio historico";
+    refs.playerDetail.appendChild(comparisonTitle);
+
+    const comparisonHint = document.createElement("p");
+    comparisonHint.className = "player-comparison-hint";
+    comparisonHint.textContent = `Media historica de rendimiento: ${formatNum(historicalAverage, 2)} puntos.`;
+    refs.playerDetail.appendChild(comparisonHint);
+
+    const comparisonChart = document.createElement("div");
+    comparisonChart.className = "player-comparison-chart";
+
+    const maxDelta = historicalComparisonItems.reduce(
+      (max, item) => Math.max(max, Math.abs(item.deltaVsAverage)),
+      0,
+    );
+    const normalizedMaxDelta = maxDelta > 0 ? maxDelta : 1;
+
+    historicalComparisonItems.forEach((item) => {
+      const row = document.createElement("article");
+      row.className = "player-comparison-row";
+
+      const header = document.createElement("div");
+      header.className = "player-comparison-head";
+
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "player-comparison-title-wrap";
+
+      const eventTitle = document.createElement("strong");
+      eventTitle.className = "player-comparison-title";
+      eventTitle.textContent = item.championshipName;
+
+      const eventMeta = document.createElement("span");
+      eventMeta.className = "player-comparison-date";
+      eventMeta.textContent = `${item.date} | Rendimiento ${formatNum(item.tournamentScore, 2)}`;
+
+      titleWrap.appendChild(eventTitle);
+      titleWrap.appendChild(eventMeta);
+
+      const status = document.createElement("span");
+      status.className = `player-comparison-badge ${item.comparisonMeta.className}`;
+      status.textContent = item.comparisonMeta.label;
+
+      header.appendChild(titleWrap);
+      header.appendChild(status);
+
+      const barWrap = document.createElement("div");
+      barWrap.className = "player-comparison-bar-wrap";
+
+      const barTrack = document.createElement("div");
+      barTrack.className = "player-comparison-bar-track";
+
+      const bar = document.createElement("span");
+      bar.className = `player-comparison-bar ${item.comparisonMeta.className}`;
+      const width = (Math.abs(item.deltaVsAverage) / normalizedMaxDelta) * 50;
+      bar.style.width = `${Math.max(Math.abs(item.deltaVsAverage) < 0.01 ? 4 : width, 4)}%`;
+      if (item.deltaVsAverage >= 0) {
+        bar.classList.add("to-right");
+      } else {
+        bar.classList.add("to-left");
+      }
+
+      barTrack.appendChild(bar);
+      barWrap.appendChild(barTrack);
+
+      const footer = document.createElement("div");
+      footer.className = "player-comparison-footer";
+      footer.innerHTML = `<span>Diferencia vs media</span><strong class="${item.comparisonMeta.className}">${item.deltaVsAverage >= 0 ? "+" : ""}${formatNum(
+        item.deltaVsAverage,
+        2,
+      )}</strong><small>${item.comparisonMeta.shortLabel}</small>`;
+
+      row.appendChild(header);
+      row.appendChild(barWrap);
+      row.appendChild(footer);
+      comparisonChart.appendChild(row);
+    });
+
+    refs.playerDetail.appendChild(comparisonChart);
   }
 
   const controls = document.createElement("div");

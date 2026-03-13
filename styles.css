@@ -911,6 +911,10 @@ input:focus-visible,
   color: #ffcf6d;
 }
 
+.player-section-comparison {
+  color: #ffc98c;
+}
+
 .player-visual-timeline {
   position: relative;
   display: grid;
@@ -1141,6 +1145,161 @@ input:focus-visible,
   box-shadow: 0 -8px 18px rgba(255, 207, 109, 0.12);
 }
 
+.player-detail-toggle-compare {
+  margin-top: 0.8rem;
+  border-color: rgba(255, 201, 140, 0.36);
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 120, 0.18), transparent 45%),
+    linear-gradient(180deg, rgba(255, 173, 92, 0.18), rgba(31, 15, 6, 0.94));
+  color: #ffe6c1;
+  box-shadow: inset 0 0 0.7rem rgba(255, 196, 120, 0.06);
+}
+
+.player-detail-toggle-compare:hover {
+  border-color: rgba(255, 201, 140, 0.64);
+  box-shadow: 0 -8px 20px rgba(255, 185, 104, 0.16);
+}
+
+.player-comparison-hint {
+  margin: 0 0 0.7rem;
+  color: #e6c7a5;
+  font-size: 0.86rem;
+}
+
+.player-comparison-chart {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.player-comparison-row {
+  border: 1px solid rgba(255, 201, 140, 0.2);
+  border-radius: 14px;
+  padding: 0.75rem 0.8rem;
+  background:
+    radial-gradient(circle at top left, rgba(255, 209, 120, 0.12), transparent 40%),
+    radial-gradient(circle at bottom right, rgba(110, 214, 194, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(26, 15, 8, 0.97), rgba(10, 9, 8, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 238, 214, 0.04);
+}
+
+.player-comparison-head,
+.player-comparison-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.player-comparison-title-wrap {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.player-comparison-title {
+  color: #fff1dd;
+  font-size: 0.92rem;
+}
+
+.player-comparison-date {
+  color: #d8bca0;
+  font-size: 0.79rem;
+}
+
+.player-comparison-badge {
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.player-comparison-badge.is-positive {
+  color: #b8f2d3;
+  background: rgba(94, 242, 185, 0.13);
+  border-color: rgba(94, 242, 185, 0.24);
+}
+
+.player-comparison-badge.is-negative {
+  color: #ffd0ae;
+  background: rgba(255, 152, 91, 0.12);
+  border-color: rgba(255, 177, 117, 0.24);
+}
+
+.player-comparison-badge.is-neutral {
+  color: #ffe4bf;
+  background: rgba(255, 207, 109, 0.12);
+  border-color: rgba(255, 207, 109, 0.22);
+}
+
+.player-comparison-bar-wrap {
+  margin: 0.7rem 0 0.55rem;
+}
+
+.player-comparison-bar-track {
+  position: relative;
+  display: grid;
+  align-items: center;
+  height: 1rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 152, 91, 0.12) 0%, rgba(255, 244, 224, 0.06) 50%, rgba(94, 242, 185, 0.1) 100%);
+  border: 1px solid rgba(255, 230, 196, 0.06);
+  overflow: hidden;
+}
+
+.player-comparison-bar-track::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgba(255, 238, 214, 0.4);
+}
+
+.player-comparison-bar {
+  position: absolute;
+  top: 0.16rem;
+  bottom: 0.16rem;
+  border-radius: 999px;
+}
+
+.player-comparison-bar.to-right {
+  left: 50%;
+}
+
+.player-comparison-bar.to-left {
+  right: 50%;
+}
+
+.player-comparison-bar.is-positive {
+  background: linear-gradient(90deg, #48bb88, #8cf0c2);
+  box-shadow: 0 0 14px rgba(94, 242, 185, 0.24);
+}
+
+.player-comparison-bar.is-negative {
+  background: linear-gradient(90deg, #ff9860, #ffc08c);
+  box-shadow: 0 0 14px rgba(255, 173, 92, 0.22);
+}
+
+.player-comparison-bar.is-neutral {
+  background: linear-gradient(90deg, #f2be63, #ffe09f);
+  box-shadow: 0 0 14px rgba(255, 207, 109, 0.2);
+}
+
+.player-comparison-footer span,
+.player-comparison-footer small {
+  color: #d8bca0;
+  font-size: 0.78rem;
+}
+
+.player-comparison-footer strong {
+  font-size: 0.92rem;
+  text-shadow: 0 0 0.4rem rgba(255, 235, 199, 0.08);
+}
+
 
 .name-editor-head {
   display: flex;
@@ -1363,6 +1522,16 @@ input:focus-visible,
   .player-timeline-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .player-comparison-head,
+  .player-comparison-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .player-comparison-badge {
+    align-self: flex-start;
   }
 
   .player-timeline-badge {
