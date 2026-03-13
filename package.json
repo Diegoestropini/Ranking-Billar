@@ -1,0 +1,7 @@
+{
+  "name": "ranking-billar",
+  "private": true,
+  "scripts": {
+    "test": "node core.test.js"
+  }
+}

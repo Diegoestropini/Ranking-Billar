@@ -74,6 +74,36 @@ const refs = {
   floatingExpandFormBtn: document.getElementById("floating-expand-form-btn"),
 };
 
+const rankingCore = window.RankingCore || null;
+
+function coreSanitizeStore(input) {
+  return rankingCore ? rankingCore.sanitizeStore(input) : sanitizeStore(input);
+}
+
+function coreParseDataContainer(rawText) {
+  return rankingCore ? rankingCore.parseDataContainer(rawText) : parseDataContainer(rawText);
+}
+
+function coreCreateBackupRecord(data, label) {
+  if (rankingCore) {
+    return rankingCore.createBackupRecord(data, label);
+  }
+  return {
+    id: createId("b"),
+    label: String(label || "Backup manual"),
+    createdAt: new Date().toISOString(),
+    data: coreSanitizeStore(data),
+  };
+}
+
+function coreBuildExportPayload(data, source) {
+  return rankingCore ? rankingCore.buildExportPayload(data, source) : buildExportPayload(data, source);
+}
+
+function coreComputeRankingMovement(championships, players) {
+  return rankingCore ? rankingCore.computeRankingMovement(championships, players) : computeRankingMovement(championships, players);
+}
+
 let dbPromise = null;
 
 function createId(prefix) {
@@ -193,14 +223,14 @@ function loadLegacyStore() {
     if (!raw) {
       return createEmptyData();
     }
-    return parseDataContainer(raw);
+    return coreParseDataContainer(raw);
   } catch (error) {
     return createEmptyData();
   }
 }
 
 function writeLegacyStore(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeStore(data)));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(coreSanitizeStore(data)));
 }
 
 function loadLegacyBackups() {
@@ -218,7 +248,7 @@ function loadLegacyBackups() {
         id: String(backup.id || createId("b")),
         label: String(backup.label || "Backup"),
         createdAt: String(backup.createdAt || new Date().toISOString()),
-        data: sanitizeStore(backup.data),
+        data: coreSanitizeStore(backup.data),
       }))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   } catch (error) {
@@ -231,7 +261,7 @@ function writeLegacyBackups(backups) {
     id: backup.id,
     label: backup.label,
     createdAt: backup.createdAt,
-    data: sanitizeStore(backup.data),
+    data: coreSanitizeStore(backup.data),
   }));
   localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(sanitized));
 }
@@ -346,7 +376,7 @@ function updatePersistenceStatus(mode, detail) {
 }
 
 async function persistStateSnapshot(data) {
-  const sanitized = sanitizeStore(data);
+  const sanitized = coreSanitizeStore(data);
   writeLegacyStore(sanitized);
 
   if (!canUseIndexedDb()) {
@@ -389,12 +419,7 @@ async function loadStore() {
 }
 
 function createBackupRecord(data, label) {
-  return {
-    id: createId("b"),
-    label: String(label || "Backup manual"),
-    createdAt: new Date().toISOString(),
-    data: sanitizeStore(data),
-  };
+  return coreCreateBackupRecord(data, label);
 }
 
 async function loadBackups() {
@@ -412,7 +437,7 @@ async function loadBackups() {
           id: String(backup.id),
           label: String(backup.label || "Backup"),
           createdAt: String(backup.createdAt || new Date().toISOString()),
-          data: sanitizeStore(backup.data),
+          data: coreSanitizeStore(backup.data),
         }))
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
       writeLegacyBackups(state.backups);
@@ -1131,7 +1156,7 @@ function validateAndBuildPayload() {
 }
 
 function renderRanking() {
-  const ranking = computeRankingMovement(state.data.championships, state.data.players);
+  const ranking = coreComputeRankingMovement(state.data.championships, state.data.players);
   refs.rankingBody.innerHTML = "";
 
   if (!ranking.length) {
@@ -2241,7 +2266,7 @@ function buildExportPayload(data, source) {
     schemaVersion: APP_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     source,
-    data: sanitizeStore(data),
+    data: coreSanitizeStore(data),
   };
 }
 
@@ -2308,7 +2333,7 @@ function renderBackups() {
     exportBtn.className = "btn btn-ghost btn-sm";
     exportBtn.textContent = "Exportar";
     exportBtn.addEventListener("click", () => {
-      downloadJsonFile(buildExportPayload(backup.data, `backup:${backup.label}`), `ranking-backup-${backup.id}.json`);
+      downloadJsonFile(coreBuildExportPayload(backup.data, `backup:${backup.label}`), `ranking-backup-${backup.id}.json`);
     });
 
     actions.appendChild(restoreBtn);
@@ -2339,7 +2364,7 @@ async function handleCreateBackup() {
 
 function handleExport() {
   try {
-    const payload = buildExportPayload(state.data, "current-state");
+    const payload = coreBuildExportPayload(state.data, "current-state");
     const datePart = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
     downloadJsonFile(payload, `ranking-billar-${datePart}.json`);
     showToast("JSON exportado.");
@@ -2364,7 +2389,7 @@ async function handleImportFile(file) {
 
   try {
     const text = await readFileAsText(file);
-    const importedData = parseDataContainer(text);
+    const importedData = coreParseDataContainer(text);
     await createBackup("Antes de importar", state.data);
     state.data = importedData;
     await persistStateSnapshot(state.data);
@@ -2452,7 +2477,7 @@ function bindUIEvents() {
 }
 
 function isSameDataSnapshot(a, b) {
-  return JSON.stringify(sanitizeStore(a)) === JSON.stringify(sanitizeStore(b));
+  return JSON.stringify(coreSanitizeStore(a)) === JSON.stringify(coreSanitizeStore(b));
 }
 
 async function init() {
