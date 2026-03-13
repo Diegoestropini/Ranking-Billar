@@ -758,6 +758,7 @@ function computeRanking(championships, players) {
           playerId: result.playerId,
           championships: 0,
           championshipsWon: 0,
+          podiums: 0,
           pointsTotal: 0,
           saldoTotalRaw: 0,
           performanceTotal: 0,
@@ -771,6 +772,7 @@ function computeRanking(championships, players) {
       if (!row) {
         return;
       }
+      const position = context?.placements?.get(result.playerId) || championship.results.length;
       row.championships += 1;
       row.pointsTotal += Number(result.points) || 0;
       row.saldoTotalRaw += Number(result.saldo) || 0;
@@ -779,6 +781,9 @@ function computeRanking(championships, players) {
       row.performanceHistory.push(tournamentPerformance);
       if (result.playerId === winnerId) {
         row.championshipsWon += 1;
+      }
+      if (position <= 3) {
+        row.podiums += 1;
       }
     });
   });
@@ -793,6 +798,7 @@ function computeRanking(championships, players) {
       return;
     }
     const promedio = row.pointsTotal / row.championships;
+    const podiumRate = row.championships > 0 ? (row.podiums / row.championships) * 100 : 0;
     const rawRating = computeRawRating(row.performanceTotal, row.championships);
     const regressedRating = applyRegressionToMean(rawRating, row.championships, baselineScore);
     const consistencyAdjustment = computeConsistencyAdjustment(
@@ -807,6 +813,8 @@ function computeRanking(championships, players) {
       name: player.name,
       championships: row.championships,
       championshipsWon: row.championshipsWon,
+      podiums: row.podiums,
+      podiumRate,
       promedio,
       saldoTotal: row.saldoTotalRaw,
       rating,
@@ -1039,7 +1047,7 @@ function renderRanking() {
   if (!ranking.length) {
     state.selectedPlayerId = null;
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
+    tr.innerHTML = '<td colspan="8" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
     refs.rankingBody.appendChild(tr);
     return;
   }
@@ -1121,6 +1129,10 @@ function renderRanking() {
       championshipsWonTd.classList.add("championship-wins-leader");
     }
 
+    const podiumRateTd = document.createElement("td");
+    podiumRateTd.setAttribute("data-label", "Efectividad de podio");
+    podiumRateTd.textContent = `${formatNum(entry.podiumRate, 1)}%`;
+
     const promedioTd = document.createElement("td");
     promedioTd.setAttribute("data-label", "Promedio");
     promedioTd.textContent = formatNum(entry.promedio, 2);
@@ -1142,6 +1154,7 @@ function renderRanking() {
     tr.appendChild(ratingTd);
     tr.appendChild(championshipsTd);
     tr.appendChild(championshipsWonTd);
+    tr.appendChild(podiumRateTd);
     tr.appendChild(promedioTd);
     tr.appendChild(saldoTd);
     refs.rankingBody.appendChild(tr);
@@ -1360,6 +1373,8 @@ function renderPlayerDetail() {
 
   const bestTournament = timeline.reduce((best, item) => (item.tournamentScore > best.tournamentScore ? item : best), timeline[0]);
   const worstTournament = timeline.reduce((worst, item) => (item.tournamentScore < worst.tournamentScore ? item : worst), timeline[0]);
+  const podiumCount = timeline.filter((item) => item.position <= 3).length;
+  const podiumRate = timeline.length ? (podiumCount / timeline.length) * 100 : 0;
 
   const summary = document.createElement("div");
   summary.className = "player-stat-grid";
@@ -1384,8 +1399,19 @@ function renderPlayerDetail() {
   worstItem.appendChild(document.createElement("br"));
   worstItem.appendChild(document.createTextNode(`Rendimiento torneo: ${formatNum(worstTournament.tournamentScore, 2)}`));
 
+  const podiumItem = document.createElement("div");
+  podiumItem.className = "player-stat-item";
+  const podiumStrong = document.createElement("strong");
+  podiumStrong.textContent = "Efectividad de podio";
+  podiumItem.appendChild(podiumStrong);
+  podiumItem.appendChild(document.createElement("br"));
+  podiumItem.appendChild(document.createTextNode(`${formatNum(podiumRate, 1)}%`));
+  podiumItem.appendChild(document.createElement("br"));
+  podiumItem.appendChild(document.createTextNode(`${podiumCount} podios en ${timeline.length} participaciones`));
+
   summary.appendChild(bestItem);
   summary.appendChild(worstItem);
+  summary.appendChild(podiumItem);
   refs.playerDetail.appendChild(summary);
 
   const timelineTitle = document.createElement("h4");
