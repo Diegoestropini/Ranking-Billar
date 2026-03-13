@@ -841,6 +841,95 @@ function computeRanking(championships, players) {
   return ranking;
 }
 
+function computeRankingMovement(championships, players) {
+  const sortedChampionships = sortChampionshipsAscending(championships);
+  const currentRanking = computeRanking(sortedChampionships, players);
+
+  if (!sortedChampionships.length) {
+    return currentRanking.map((entry, index) => ({
+      ...entry,
+      currentPosition: index + 1,
+      previousPosition: null,
+      movementDelta: null,
+      climbedPast: [],
+      overtakenBy: [],
+    }));
+  }
+
+  const previousRanking = computeRanking(sortedChampionships.slice(0, -1), players);
+  const previousPositionByPlayerId = new Map(previousRanking.map((entry, index) => [entry.playerId, index + 1]));
+  const previousAboveByPlayerId = new Map(
+    previousRanking.map((entry, index) => [entry.playerId, previousRanking.slice(0, index).map((item) => item.playerId)]),
+  );
+  const playerNameById = new Map(players.map((player) => [player.id, player.name]));
+
+  return currentRanking.map((entry, index) => {
+    const currentPosition = index + 1;
+    const previousPosition = previousPositionByPlayerId.get(entry.playerId) ?? null;
+
+    if (previousPosition === null) {
+      return {
+        ...entry,
+        currentPosition,
+        previousPosition,
+        movementDelta: null,
+        climbedPast: [],
+        overtakenBy: [],
+      };
+    }
+
+    const previousAbove = previousAboveByPlayerId.get(entry.playerId) || [];
+    const currentAbove = currentRanking.slice(0, index).map((item) => item.playerId);
+
+    return {
+      ...entry,
+      currentPosition,
+      previousPosition,
+      movementDelta: previousPosition - currentPosition,
+      climbedPast: previousAbove
+        .filter((playerId) => !currentAbove.includes(playerId))
+        .map((playerId) => playerNameById.get(playerId) || "Jugador"),
+      overtakenBy: currentAbove
+        .filter((playerId) => !previousAbove.includes(playerId))
+        .map((playerId) => playerNameById.get(playerId) || "Jugador"),
+    };
+  });
+}
+
+function getMovementMeta(entry) {
+  if (entry.previousPosition === null) {
+    return {
+      className: "movement-neutral",
+      badge: "Nuevo",
+      detail: "Sin ranking anterior",
+    };
+  }
+
+  if (entry.movementDelta > 0) {
+    const names = entry.climbedPast.length ? entry.climbedPast.join(", ") : "sin cruces directos";
+    return {
+      className: "movement-up",
+      badge: `+${entry.movementDelta}`,
+      detail: `Subio sobre ${names}`,
+    };
+  }
+
+  if (entry.movementDelta < 0) {
+    const names = entry.overtakenBy.length ? entry.overtakenBy.join(", ") : "sin cruces directos";
+    return {
+      className: "movement-down",
+      badge: String(entry.movementDelta),
+      detail: `Bajo por ${names}`,
+    };
+  }
+
+  return {
+    className: "movement-neutral",
+    badge: "=",
+    detail: "Sin cambios",
+  };
+}
+
 function showToast(message, isError = false) {
   refs.toast.textContent = message;
   refs.toast.classList.remove("hidden", "error");
@@ -1042,13 +1131,13 @@ function validateAndBuildPayload() {
 }
 
 function renderRanking() {
-  const ranking = computeRanking(state.data.championships, state.data.players);
+  const ranking = computeRankingMovement(state.data.championships, state.data.players);
   refs.rankingBody.innerHTML = "";
 
   if (!ranking.length) {
     state.selectedPlayerId = null;
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="8" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
+    tr.innerHTML = '<td colspan="9" class="empty empty-state">Sin datos de ranking todavia. Crea un campeonato para comenzar.</td>';
     refs.rankingBody.appendChild(tr);
     return;
   }
@@ -1112,6 +1201,12 @@ function renderRanking() {
     });
     playerTd.appendChild(playerBtn);
 
+    const movementTd = document.createElement("td");
+    movementTd.setAttribute("data-label", "+/-");
+    const movementMeta = getMovementMeta(entry);
+    movementTd.className = `movement-cell ${movementMeta.className}`;
+    movementTd.innerHTML = `<strong>${movementMeta.badge}</strong><small>${movementMeta.detail}</small>`;
+
     const ratingTd = document.createElement("td");
     ratingTd.setAttribute("data-label", "Rating");
     ratingTd.textContent = formatNum(entry.rating, 3);
@@ -1153,6 +1248,7 @@ function renderRanking() {
 
     tr.appendChild(posTd);
     tr.appendChild(playerTd);
+    tr.appendChild(movementTd);
     tr.appendChild(ratingTd);
     tr.appendChild(championshipsTd);
     tr.appendChild(championshipsWonTd);

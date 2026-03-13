@@ -313,7 +313,9 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(4),
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(5),
 #ranking-body tr.rank-top:nth-child(1) td:nth-child(6),
-#ranking-body tr.rank-top:nth-child(1) td:nth-child(7) {
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(7),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(8),
+#ranking-body tr.rank-top:nth-child(1) td:nth-child(9) {
   color: var(--gold);
   font-weight: 700;
 }
@@ -323,7 +325,9 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(4),
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(5),
 #ranking-body tr.rank-top:nth-child(2) td:nth-child(6),
-#ranking-body tr.rank-top:nth-child(2) td:nth-child(7) {
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(7),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(8),
+#ranking-body tr.rank-top:nth-child(2) td:nth-child(9) {
   color: var(--silver);
   font-weight: 700;
 }
@@ -333,7 +337,9 @@ input:focus {
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(4),
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(5),
 #ranking-body tr.rank-top:nth-child(3) td:nth-child(6),
-#ranking-body tr.rank-top:nth-child(3) td:nth-child(7) {
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(7),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(8),
+#ranking-body tr.rank-top:nth-child(3) td:nth-child(9) {
   color: var(--bronze);
   font-weight: 700;
 }
@@ -356,7 +362,9 @@ input:focus {
 #ranking-body tr.rank-dynamic td:nth-child(4),
 #ranking-body tr.rank-dynamic td:nth-child(5),
 #ranking-body tr.rank-dynamic td:nth-child(6),
-#ranking-body tr.rank-dynamic td:nth-child(7) {
+#ranking-body tr.rank-dynamic td:nth-child(7),
+#ranking-body tr.rank-dynamic td:nth-child(8),
+#ranking-body tr.rank-dynamic td:nth-child(9) {
   color: #9fd6ff;
   font-weight: 600;
 }
@@ -397,6 +405,39 @@ input:focus {
 
 .num-zero {
   color: #d2e8f6;
+}
+
+.movement-cell {
+  min-width: 10.5rem;
+}
+
+.movement-cell strong,
+.movement-cell small {
+  display: block;
+}
+
+.movement-cell strong {
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.movement-cell small {
+  margin-top: 0.14rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: normal;
+}
+
+.movement-up strong {
+  color: #7dffbd;
+}
+
+.movement-down strong {
+  color: #ff8eb0;
+}
+
+.movement-neutral strong {
+  color: #cfe6f7;
 }
 
 .player-name-btn {
