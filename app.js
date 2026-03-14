@@ -464,6 +464,13 @@ function parseNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+const MEDAL_ICONS = {
+  gold: "\u{1F947}",
+  silver: "\u{1F948}",
+  bronze: "\u{1F949}",
+  total: "\u{1F3C5}",
+};
+
 function getMovementMeta(entry) {
   if (entry.previousPosition === null) {
     return {
@@ -655,7 +662,7 @@ function validateAndBuildPayload() {
   }
 
   const normalizedInChampionship = new Set();
-  const results = [];
+  const validatedRows = [];
 
   rows.forEach((row, index) => {
     const playerInput = row.querySelector(".player-input");
@@ -683,12 +690,20 @@ function validateAndBuildPayload() {
     }
     normalizedInChampionship.add(normalized);
 
-    const player = getOrCreatePlayerByName(playerName);
-    results.push({
-      playerId: player.id,
+    validatedRows.push({
+      playerName,
       points,
       saldo,
     });
+  });
+
+  const results = validatedRows.map((row) => {
+    const player = getOrCreatePlayerByName(row.playerName);
+    return {
+      playerId: player.id,
+      points: row.points,
+      saldo: row.saldo,
+    };
   });
 
   return {
@@ -773,7 +788,12 @@ function renderRanking() {
     movementTd.setAttribute("data-label", "+/-");
     const movementMeta = getMovementMeta(entry);
     movementTd.className = `movement-cell ${movementMeta.className}`;
-    movementTd.innerHTML = `<strong>${movementMeta.badge}</strong><small>${movementMeta.detail}</small>`;
+    const movementStrong = document.createElement("strong");
+    movementStrong.textContent = movementMeta.badge;
+    const movementSmall = document.createElement("small");
+    movementSmall.textContent = movementMeta.detail;
+    movementTd.appendChild(movementStrong);
+    movementTd.appendChild(movementSmall);
 
     const ratingTd = document.createElement("td");
     ratingTd.setAttribute("data-label", "Rating");
@@ -1616,7 +1636,7 @@ function getMedalCategoryLeader(entries, key) {
   };
 }
 
-function renderMedalsPanel() {
+function renderMedalsPanelLegacyUnsafe() {
   refs.medalsPanel.innerHTML = "";
 
   if (!state.medalsPanelOpen) {
@@ -1687,6 +1707,103 @@ function renderMedalsPanel() {
     const row = document.createElement("div");
     row.className = "medals-row";
     row.innerHTML = `<strong>${entry.name}</strong><span>🥇 ${entry.gold}</span><span>🥈 ${entry.silver}</span><span>🥉 ${entry.bronze}</span><span>🏅 ${entry.total}</span>`;
+    list.appendChild(row);
+  });
+
+  refs.medalsPanel.appendChild(list);
+}
+
+function renderMedalsPanel() {
+  refs.medalsPanel.innerHTML = "";
+
+  if (!state.medalsPanelOpen) {
+    refs.medalsPanel.classList.add("hidden");
+    refs.toggleMedalsBtn.textContent = "Medallas";
+    return;
+  }
+
+  refs.medalsPanel.classList.remove("hidden");
+  refs.toggleMedalsBtn.textContent = "Cerrar medallas";
+
+  const title = document.createElement("h3");
+  title.className = "medals-panel-title";
+  title.textContent = "Medallero";
+  refs.medalsPanel.appendChild(title);
+
+  const standings = computeMedalStandings();
+  if (!standings.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty empty-state";
+    empty.textContent = "Todavia no hay suficientes campeonatos para mostrar medallas.";
+    refs.medalsPanel.appendChild(empty);
+    return;
+  }
+
+  const summary = document.createElement("div");
+  summary.className = "medals-summary-grid";
+
+  [
+    { icon: MEDAL_ICONS.gold, label: "Mas oros", key: "gold" },
+    { icon: MEDAL_ICONS.silver, label: "Mas platas", key: "silver" },
+    { icon: MEDAL_ICONS.bronze, label: "Mas bronces", key: "bronze" },
+    { icon: MEDAL_ICONS.total, label: "Medallas totales", key: "total" },
+  ].forEach((category) => {
+    const leader = getMedalCategoryLeader(standings, category.key);
+    const card = document.createElement("article");
+    card.className = "medal-summary-card";
+
+    const cardLabel = document.createElement("span");
+    cardLabel.className = "medal-summary-label";
+    cardLabel.textContent = `${category.icon} ${category.label}`;
+
+    const cardNames = document.createElement("strong");
+    cardNames.className = "medal-summary-names";
+    cardNames.textContent = leader ? leader.names.join(" / ") : "Sin lider";
+
+    const cardValue = document.createElement("small");
+    cardValue.className = "medal-summary-value";
+    cardValue.textContent = leader ? `${leader.value} ${leader.value === 1 ? "medalla" : "medallas"}` : "0 medallas";
+
+    card.appendChild(cardLabel);
+    card.appendChild(cardNames);
+    card.appendChild(cardValue);
+    summary.appendChild(card);
+  });
+
+  refs.medalsPanel.appendChild(summary);
+
+  const tableTitle = document.createElement("h4");
+  tableTitle.className = "player-section-title medals-table-title";
+  tableTitle.textContent = "Medallero general";
+  refs.medalsPanel.appendChild(tableTitle);
+
+  const list = document.createElement("div");
+  list.className = "medals-list";
+
+  standings.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "medals-row";
+
+    const name = document.createElement("strong");
+    name.textContent = entry.name;
+
+    const gold = document.createElement("span");
+    gold.textContent = `${MEDAL_ICONS.gold} ${entry.gold}`;
+
+    const silver = document.createElement("span");
+    silver.textContent = `${MEDAL_ICONS.silver} ${entry.silver}`;
+
+    const bronze = document.createElement("span");
+    bronze.textContent = `${MEDAL_ICONS.bronze} ${entry.bronze}`;
+
+    const total = document.createElement("span");
+    total.textContent = `${MEDAL_ICONS.total} ${entry.total}`;
+
+    row.appendChild(name);
+    row.appendChild(gold);
+    row.appendChild(silver);
+    row.appendChild(bronze);
+    row.appendChild(total);
     list.appendChild(row);
   });
 
