@@ -865,11 +865,11 @@ function getPerformanceLabel(position, totalParticipants) {
   if (position === 1) {
     return "Excelente";
   }
-  if (position >= Math.max(2, totalParticipants - 1)) {
-    return "Muy insuficiente";
-  }
   if (position >= 2 && position <= 4) {
     return "Muy bueno";
+  }
+  if (position >= Math.max(2, totalParticipants - 1)) {
+    return "Muy insuficiente";
   }
   if (position >= 5 && position <= 8) {
     return "Bueno";
@@ -884,11 +884,11 @@ function getPerformanceTone(position, totalParticipants) {
   if (position === 1) {
     return "strong";
   }
-  if (position >= Math.max(2, totalParticipants - 1)) {
-    return "very-low";
-  }
   if (position >= 2 && position <= 4) {
     return "strong";
+  }
+  if (position >= Math.max(2, totalParticipants - 1)) {
+    return "very-low";
   }
   if (position >= 5 && position <= 8) {
     return "mid";
@@ -901,13 +901,13 @@ function getPerformanceTone(position, totalParticipants) {
 
 function getPlacementMedal(position) {
   if (position === 1) {
-    return "🥇";
+    return "\u{1F947}";
   }
   if (position === 2) {
-    return "🥈";
+    return "\u{1F948}";
   }
   if (position === 3) {
-    return "🥉";
+    return "\u{1F949}";
   }
   return "";
 }
@@ -992,23 +992,38 @@ function getNormalizedMetric(value, min, max) {
 function getRatingDeltaMeta(delta) {
   if (delta > 0) {
     return {
-      symbol: "▲",
+      symbol: "\u25B2",
       className: "is-positive",
       text: `+${formatNum(delta, 3)}`,
     };
   }
   if (delta < 0) {
     return {
-      symbol: "▼",
+      symbol: "\u25BC",
       className: "is-negative",
       text: formatNum(delta, 3),
     };
   }
   return {
-    symbol: "•",
+    symbol: "\u2022",
     className: "is-neutral",
     text: formatNum(delta, 3),
   };
+}
+
+function ensurePersistenceReady(actionLabel = "hacer cambios") {
+  if (state.persistenceReady) {
+    return true;
+  }
+  showToast(`Espera a que termine la carga antes de ${actionLabel}.`, true);
+  return false;
+}
+
+function updateMutationControls() {
+  const disabled = !state.persistenceReady;
+  refs.saveBtn.disabled = disabled;
+  refs.backupBtn.disabled = disabled;
+  refs.importInput.disabled = disabled;
 }
 
 function getHistoricalComparisonMeta(delta) {
@@ -1421,6 +1436,9 @@ function renderPlayerDetail() {
 }
 
 function savePlayerNameChanges() {
+  if (!ensurePersistenceReady("guardar nombres")) {
+    return;
+  }
   const nameInputs = [...refs.nameEditor.querySelectorAll(".edit-player-name-input")];
   if (!nameInputs.length) {
     return;
@@ -1863,7 +1881,11 @@ function renderChampionships() {
     deleteBtn.type = "button";
     deleteBtn.className = "btn btn-danger";
     deleteBtn.textContent = "Eliminar";
+    deleteBtn.disabled = !state.persistenceReady;
     deleteBtn.addEventListener("click", () => {
+      if (!ensurePersistenceReady("eliminar campeonatos")) {
+        return;
+      }
       const ok = window.confirm(`Seguro que quiere eliminar "${championship.name}"? Esta accion no se puede deshacer.`);
       if (!ok) {
         return;
@@ -1951,7 +1973,11 @@ function renderBackups() {
     restoreBtn.type = "button";
     restoreBtn.className = "btn btn-secondary btn-sm";
     restoreBtn.textContent = "Restaurar";
+    restoreBtn.disabled = !state.persistenceReady;
     restoreBtn.addEventListener("click", async () => {
+      if (!ensurePersistenceReady("restaurar backups")) {
+        return;
+      }
       const ok = window.confirm(`Se restaurara el backup "${backup.label}". Antes se guardara una copia del estado actual. Continuar?`);
       if (!ok) {
         return;
@@ -1994,6 +2020,9 @@ function renderAll() {
 }
 
 async function handleCreateBackup() {
+  if (!ensurePersistenceReady("crear backups")) {
+    return;
+  }
   try {
     await createBackup("Backup manual", state.data);
     showToast("Backup creado.");
@@ -2024,6 +2053,10 @@ function readFileAsText(file) {
 
 async function handleImportFile(file) {
   if (!file) {
+    return;
+  }
+  if (!ensurePersistenceReady("importar datos")) {
+    refs.importInput.value = "";
     return;
   }
 
@@ -2093,6 +2126,9 @@ function bindUIEvents() {
 
   refs.form.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (!ensurePersistenceReady("guardar campeonatos")) {
+      return;
+    }
     try {
       const payload = validateAndBuildPayload();
 
@@ -2126,6 +2162,7 @@ async function init() {
   updatePersistenceStatus("localStorage", "Cargando persistencia...");
 
   bindUIEvents();
+  updateMutationControls();
   setFormCollapsed(false);
   resetForm();
   renderAll();
@@ -2139,6 +2176,7 @@ async function init() {
     state.data = persistedData;
     state.backups = persistedBackups;
     state.persistenceReady = true;
+    updateMutationControls();
 
     if (shouldRenderData || shouldRenderBackups) {
       renderAll();
@@ -2147,6 +2185,7 @@ async function init() {
     }
   } catch (error) {
     state.persistenceReady = true;
+    updateMutationControls();
     updatePersistenceStatus("localStorage", "Usando localStorage");
   }
 }
