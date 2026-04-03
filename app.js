@@ -379,35 +379,79 @@ async function createBackup(label, data = state.data) {
   return backup;
 }
 
-function saveStore(data) {
-  return persistStateSnapshot(data).catch((error) => {
+async function saveStore(data) {
+  try {
+    return await persistStateSnapshot(data);
+  } catch (error) {
     updatePersistenceStatus("error", "Error de guardado");
-    showToast(error.message || "No se pudieron guardar los datos.", true);
-  });
+    throw error;
+  }
 }
 
 function getPlayerById(playerId) {
   return state.data.players.find((player) => player.id === playerId) || null;
 }
 
-function getOrCreatePlayerByName(name) {
-  const normalized = normalizeName(name);
-  const found = state.data.players.find((player) => normalizeName(player.name) === normalized);
-  if (found) {
-    return found;
-  }
-
-  const now = new Date().toISOString();
-  const player = {
-    id: createId("p"),
-    name: String(name).trim().replace(/\s+/g, " "),
-    createdAt: now,
-  };
-  state.data.players.push(player);
-  return player;
+function getPlayerByNormalizedName(normalizedName) {
+  return state.data.players.find((player) => normalizeName(player.name) === normalizedName) || null;
 }
 
-function createChampionship(payload) {
+function createPlayerRecord(name) {
+  return {
+    id: createId("p"),
+    name: String(name).trim().replace(/\s+/g, " "),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function buildResultsPayload(validatedRows) {
+  const stagedPlayers = new Map();
+  const playersToCreate = [];
+
+  const results = validatedRows.map((row) => {
+    const normalized = normalizeName(row.playerName);
+    const existingPlayer = getPlayerByNormalizedName(normalized);
+    if (existingPlayer) {
+      return {
+        playerId: existingPlayer.id,
+        points: row.points,
+        saldo: row.saldo,
+      };
+    }
+
+    let stagedPlayer = stagedPlayers.get(normalized);
+    if (!stagedPlayer) {
+      stagedPlayer = createPlayerRecord(row.playerName);
+      stagedPlayers.set(normalized, stagedPlayer);
+      playersToCreate.push(stagedPlayer);
+    }
+
+    return {
+      playerId: stagedPlayer.id,
+      points: row.points,
+      saldo: row.saldo,
+    };
+  });
+
+  return {
+    results,
+    playersToCreate,
+  };
+}
+
+async function commitDataMutation(mutator) {
+  const previousData = cloneData(state.data);
+  try {
+    mutator(state.data);
+    await saveStore(state.data);
+    return true;
+  } catch (error) {
+    state.data = previousData;
+    throw error;
+  }
+}
+
+async function createChampionship(payload) {
   const now = new Date().toISOString();
   const championship = {
     id: createId("c"),
@@ -417,33 +461,47 @@ function createChampionship(payload) {
     createdAt: now,
     updatedAt: now,
   };
-  state.data.championships.push(championship);
-  saveStore(state.data);
+  await commitDataMutation((draft) => {
+    if (payload.playersToCreate?.length) {
+      draft.players.push(...payload.playersToCreate.map((player) => ({ ...player })));
+    }
+    draft.championships.push(championship);
+  });
   return championship;
 }
 
-function updateChampionship(championshipId, payload) {
-  const item = state.data.championships.find((championship) => championship.id === championshipId);
-  if (!item) {
-    return null;
-  }
+async function updateChampionship(championshipId, payload) {
+  let updated = null;
+  await commitDataMutation((draft) => {
+    const item = draft.championships.find((championship) => championship.id === championshipId);
+    if (!item) {
+      throw new Error("No se pudo actualizar el campeonato.");
+    }
 
-  item.name = payload.name;
-  item.date = payload.date;
-  item.results = payload.results;
-  item.updatedAt = new Date().toISOString();
-  saveStore(state.data);
-  return item;
+    if (payload.playersToCreate?.length) {
+      draft.players.push(...payload.playersToCreate.map((player) => ({ ...player })));
+    }
+
+    item.name = payload.name;
+    item.date = payload.date;
+    item.results = payload.results;
+    item.updatedAt = new Date().toISOString();
+    updated = item;
+  });
+  return updated;
 }
 
-function deleteChampionship(championshipId) {
-  const idx = state.data.championships.findIndex((championship) => championship.id === championshipId);
-  if (idx === -1) {
-    return false;
-  }
-  state.data.championships.splice(idx, 1);
-  saveStore(state.data);
-  return true;
+async function deleteChampionship(championshipId) {
+  let deleted = false;
+  await commitDataMutation((draft) => {
+    const idx = draft.championships.findIndex((championship) => championship.id === championshipId);
+    if (idx === -1) {
+      return;
+    }
+    draft.championships.splice(idx, 1);
+    deleted = true;
+  });
+  return deleted;
 }
 
 function formatNum(value, decimals = 2) {
@@ -675,11 +733,26 @@ function renderLossCalculatorResult(result) {
       ? `${winnerLabel} estaba mas cerca de ganar (${result.winner.balls} contra ${result.loser.balls}) y se lleva la diferencia completa.`
       : `${loserLabel} era quien estaba mas cerca de ganar o iba empatado, asi que ${winnerLabel} gana la partida pero el saldo queda en 0.`;
 
-  refs.lossCalculatorResult.innerHTML = `
-    <div class="loss-result-badge">Gana ${winnerLabel}</div>
-    <p class="loss-result-score">Saldo: <strong>${saldoLabel}</strong></p>
-    <p class="loss-result-detail">${detail}</p>
-  `;
+  refs.lossCalculatorResult.replaceChildren();
+
+  const badge = document.createElement("div");
+  badge.className = "loss-result-badge";
+  badge.textContent = `Gana ${winnerLabel}`;
+
+  const score = document.createElement("p");
+  score.className = "loss-result-score";
+  score.append("Saldo: ");
+  const scoreValue = document.createElement("strong");
+  scoreValue.textContent = saldoLabel;
+  score.appendChild(scoreValue);
+
+  const detailNode = document.createElement("p");
+  detailNode.className = "loss-result-detail";
+  detailNode.textContent = detail;
+
+  refs.lossCalculatorResult.appendChild(badge);
+  refs.lossCalculatorResult.appendChild(score);
+  refs.lossCalculatorResult.appendChild(detailNode);
   refs.lossCalculatorResult.classList.remove("hidden");
 }
 
@@ -794,19 +867,13 @@ function validateAndBuildPayload() {
     });
   });
 
-  const results = validatedRows.map((row) => {
-    const player = getOrCreatePlayerByName(row.playerName);
-    return {
-      playerId: player.id,
-      points: row.points,
-      saldo: row.saldo,
-    };
-  });
+  const { results, playersToCreate } = buildResultsPayload(validatedRows);
 
   return {
     name,
     date,
     results,
+    playersToCreate,
   };
 }
 
@@ -1532,7 +1599,7 @@ function renderPlayerDetail() {
   refs.playerDetail.classList.remove("hidden");
 }
 
-function savePlayerNameChanges() {
+async function savePlayerNameChanges() {
   if (!ensurePersistenceReady("guardar nombres")) {
     return;
   }
@@ -1560,11 +1627,7 @@ function savePlayerNameChanges() {
   let changed = false;
   state.data.players.forEach((player) => {
     const nextName = namesById.get(player.id);
-    if (!nextName) {
-      return;
-    }
-    if (player.name !== nextName) {
-      player.name = nextName;
+    if (nextName && player.name !== nextName) {
       changed = true;
     }
   });
@@ -1574,7 +1637,14 @@ function savePlayerNameChanges() {
     return;
   }
 
-  saveStore(state.data);
+  await commitDataMutation((draft) => {
+    draft.players.forEach((player) => {
+      const nextName = namesById.get(player.id);
+      if (nextName) {
+        player.name = nextName;
+      }
+    });
+  });
   renderAll();
   showToast("Nombres de jugadores actualizados.");
 }
@@ -1604,9 +1674,9 @@ function renderNameEditor() {
   saveBtn.type = "button";
   saveBtn.className = "btn btn-primary btn-sm";
   saveBtn.textContent = "Guardar nombres";
-  saveBtn.addEventListener("click", () => {
+  saveBtn.addEventListener("click", async () => {
     try {
-      savePlayerNameChanges();
+      await savePlayerNameChanges();
     } catch (error) {
       showToast(error.message || "No se pudieron guardar los nombres.", true);
     }
@@ -1979,7 +2049,7 @@ function renderChampionships() {
     deleteBtn.className = "btn btn-danger";
     deleteBtn.textContent = "Eliminar";
     deleteBtn.disabled = !state.persistenceReady;
-    deleteBtn.addEventListener("click", () => {
+    deleteBtn.addEventListener("click", async () => {
       if (!ensurePersistenceReady("eliminar campeonatos")) {
         return;
       }
@@ -1987,12 +2057,18 @@ function renderChampionships() {
       if (!ok) {
         return;
       }
-      if (deleteChampionship(championship.id)) {
+      try {
+        const deleted = await deleteChampionship(championship.id);
+        if (!deleted) {
+          return;
+        }
         if (state.editingChampionshipId === championship.id) {
           resetForm();
         }
         renderAll();
         showToast("Campeonato eliminado.");
+      } catch (error) {
+        showToast(error.message || "No se pudo eliminar el campeonato.", true);
       }
     });
 
@@ -2234,7 +2310,7 @@ function bindUIEvents() {
 
   refs.lossCalculatorForm.addEventListener("submit", handleLossCalculatorSubmit);
 
-  refs.form.addEventListener("submit", (event) => {
+  refs.form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!ensurePersistenceReady("guardar campeonatos")) {
       return;
@@ -2243,21 +2319,20 @@ function bindUIEvents() {
       const payload = validateAndBuildPayload();
 
       if (state.editingChampionshipId) {
-        const updated = updateChampionship(state.editingChampionshipId, payload);
+        const updated = await updateChampionship(state.editingChampionshipId, payload);
         if (!updated) {
           throw new Error("No se pudo actualizar el campeonato.");
         }
         showToast("Campeonato actualizado.");
       } else {
-        createChampionship(payload);
+        await createChampionship(payload);
         showToast("Campeonato guardado.");
       }
 
-      saveStore(state.data);
       resetForm();
       renderAll();
     } catch (error) {
-      showToast(error.message || "Error de validacion.", true);
+      showToast(error.message || "No se pudo guardar el campeonato.", true);
     }
   });
 }
