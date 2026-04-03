@@ -78,6 +78,10 @@ body {
   font-size: 0.96rem;
 }
 
+.utility-btn {
+  margin-top: 1rem;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 1.15fr 1fr;
@@ -140,11 +144,21 @@ body {
   grid-column: 1 / -1;
 }
 
+.loss-calculator-card {
+  grid-column: 1 / -1;
+}
+
 h2,
 h3 {
   margin: 0 0 0.7rem;
   font-family: "Orbitron", "Lucida Sans", sans-serif;
   letter-spacing: 0.04em;
+}
+
+.card-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
 }
 
 .card-title-row {
@@ -197,6 +211,21 @@ input {
 }
 
 input:focus {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-soft);
+}
+
+select {
+  width: 100%;
+  color: var(--text);
+  background: rgba(3, 10, 24, 0.8);
+  border: 1px solid rgba(74, 224, 255, 0.35);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  outline: none;
+}
+
+select:focus {
   border-color: var(--cyan);
   box-shadow: var(--glow-soft);
 }
@@ -481,9 +510,82 @@ input:focus {
 
 .btn:focus-visible,
 input:focus-visible,
-.player-name-btn:focus-visible {
+.player-name-btn:focus-visible,
+select:focus-visible {
   outline: 2px solid rgba(120, 224, 255, 0.85);
   outline-offset: 2px;
+}
+
+.loss-calculator-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.loss-player-block {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(74, 224, 255, 0.22);
+  background: rgba(7, 18, 41, 0.54);
+}
+
+.loss-player-tag {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  background: rgba(74, 224, 255, 0.14);
+  border: 1px solid rgba(74, 224, 255, 0.3);
+  color: #c9f8ff;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.loss-versus {
+  font-family: "Orbitron", "Lucida Sans", sans-serif;
+  font-size: 1.2rem;
+  color: var(--cyan);
+  text-align: center;
+}
+
+.loss-controls {
+  margin-top: 1rem;
+  max-width: 18rem;
+}
+
+.loss-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(94, 242, 185, 0.38);
+  background: linear-gradient(180deg, rgba(9, 34, 37, 0.9), rgba(7, 20, 31, 0.8));
+}
+
+.loss-result-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(94, 242, 185, 0.16);
+  border: 1px solid rgba(94, 242, 185, 0.45);
+  color: #cffff0;
+  font-weight: 700;
+}
+
+.loss-result-score {
+  margin: 0.75rem 0 0;
+  font-size: 1.05rem;
+}
+
+.loss-result-detail {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .btn-primary {
@@ -1525,6 +1627,14 @@ input:focus-visible,
 
   #ranking-table td.empty::before {
     content: "";
+  }
+
+  .loss-calculator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .loss-versus {
+    padding: 0.2rem 0;
   }
 }
 

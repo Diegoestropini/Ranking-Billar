@@ -16,9 +16,68 @@
     <header class="topbar">
       <h1>Ranking de Billar</h1>
       <p>Campeonatos, puntajes, saldos y ranking justo en tiempo real</p>
+      <button id="toggle-loss-calculator-btn" type="button" class="btn btn-secondary utility-btn" aria-expanded="false">
+        Calculadora de perdidas
+      </button>
     </header>
 
     <main class="layout">
+      <section id="loss-calculator-card" class="card loss-calculator-card hidden">
+        <div class="card-title-row">
+          <div>
+            <h2>Calculadora de perdidas</h2>
+            <p class="card-subtitle">Herramienta aparte para calcular el saldo cuando un participante se pierde.</p>
+          </div>
+        </div>
+
+        <form id="loss-calculator-form" novalidate>
+          <div class="loss-calculator-grid">
+            <div class="loss-player-block">
+              <span class="loss-player-tag">Bolas lisas</span>
+              <label class="field">
+                <span>Participante A</span>
+                <input id="loss-player-a-name" type="text" maxlength="80" placeholder="Nombre de A" />
+              </label>
+              <label class="field">
+                <span>Bolas restantes</span>
+                <input id="loss-player-a-balls" type="number" min="0" max="7" step="1" value="0" />
+              </label>
+            </div>
+
+            <div class="loss-versus">vs</div>
+
+            <div class="loss-player-block">
+              <span class="loss-player-tag">Bolas rayadas</span>
+              <label class="field">
+                <span>Participante B</span>
+                <input id="loss-player-b-name" type="text" maxlength="80" placeholder="Nombre de B" />
+              </label>
+              <label class="field">
+                <span>Bolas restantes</span>
+                <input id="loss-player-b-balls" type="number" min="0" max="7" step="1" value="0" />
+              </label>
+            </div>
+          </div>
+
+          <div class="loss-controls">
+            <label class="field">
+              <span>Participante que se pierde</span>
+              <select id="loss-loser-select">
+                <option value="A">A</option>
+                <option value="B">B</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button id="calculate-loss-btn" type="submit" class="btn btn-primary">Calcular perdida</button>
+            <button id="reset-loss-calculator-btn" type="button" class="btn btn-ghost">Limpiar</button>
+          </div>
+        </form>
+
+        <div id="loss-calculator-result" class="loss-result hidden" aria-live="polite"></div>
+      </section>
+
       <section class="card data-card collapsed">
         <button id="toggle-data-btn" type="button" class="data-toggle" aria-expanded="false">
           <span>Persistencia y backups</span>

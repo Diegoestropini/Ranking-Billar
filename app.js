@@ -28,6 +28,7 @@ const state = {
   persistenceMode: "localStorage",
   persistenceReady: false,
   dataPanelOpen: false,
+  lossCalculatorOpen: false,
 };
 
 const refs = {
@@ -60,6 +61,16 @@ const refs = {
   importInput: document.getElementById("import-input"),
   backupList: document.getElementById("backup-list"),
   floatingExpandFormBtn: document.getElementById("floating-expand-form-btn"),
+  toggleLossCalculatorBtn: document.getElementById("toggle-loss-calculator-btn"),
+  lossCalculatorCard: document.getElementById("loss-calculator-card"),
+  lossCalculatorForm: document.getElementById("loss-calculator-form"),
+  lossPlayerAName: document.getElementById("loss-player-a-name"),
+  lossPlayerABalls: document.getElementById("loss-player-a-balls"),
+  lossPlayerBName: document.getElementById("loss-player-b-name"),
+  lossPlayerBBalls: document.getElementById("loss-player-b-balls"),
+  lossLoserSelect: document.getElementById("loss-loser-select"),
+  resetLossCalculatorBtn: document.getElementById("reset-loss-calculator-btn"),
+  lossCalculatorResult: document.getElementById("loss-calculator-result"),
 };
 
 const rankingCore = window.RankingCore;
@@ -464,6 +475,14 @@ function parseNumber(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+function parseBallCount(value) {
+  const num = parseNumber(value);
+  if (num === null || !Number.isInteger(num) || num < 0 || num > 7) {
+    return null;
+  }
+  return num;
+}
+
 const MEDAL_ICONS = {
   gold: "\u{1F947}",
   silver: "\u{1F948}",
@@ -613,6 +632,84 @@ function resetForm() {
   refs.saveBtn.textContent = "Guardar campeonato";
   clearResultRows();
   addResultRow();
+}
+
+function setLossCalculatorOpen(open) {
+  state.lossCalculatorOpen = Boolean(open);
+  refs.lossCalculatorCard.classList.toggle("hidden", !state.lossCalculatorOpen);
+  refs.toggleLossCalculatorBtn.setAttribute("aria-expanded", state.lossCalculatorOpen ? "true" : "false");
+  refs.toggleLossCalculatorBtn.textContent = state.lossCalculatorOpen ? "Ocultar calculadora de perdidas" : "Calculadora de perdidas";
+}
+
+function resetLossCalculator() {
+  refs.lossCalculatorForm.reset();
+  refs.lossPlayerABalls.value = "0";
+  refs.lossPlayerBBalls.value = "0";
+  refs.lossLoserSelect.value = "A";
+  refs.lossCalculatorResult.classList.add("hidden");
+  refs.lossCalculatorResult.innerHTML = "";
+}
+
+function calculateLossOutcome(payload) {
+  const loserKey = payload.loserKey;
+  const winnerKey = loserKey === "A" ? "B" : "A";
+  const loser = payload.players[loserKey];
+  const winner = payload.players[winnerKey];
+  const saldo = winner.balls < loser.balls ? loser.balls - winner.balls : 0;
+
+  return {
+    loserKey,
+    winnerKey,
+    loser,
+    winner,
+    saldo,
+  };
+}
+
+function renderLossCalculatorResult(result) {
+  const winnerLabel = result.winner.name || `Participante ${result.winnerKey}`;
+  const loserLabel = result.loser.name || `Participante ${result.loserKey}`;
+  const saldoLabel = result.saldo > 0 ? `+${result.saldo}` : "0";
+  const detail =
+    result.saldo > 0
+      ? `${winnerLabel} estaba mas cerca de ganar (${result.winner.balls} contra ${result.loser.balls}) y se lleva la diferencia completa.`
+      : `${loserLabel} era quien estaba mas cerca de ganar o iba empatado, asi que ${winnerLabel} gana la partida pero el saldo queda en 0.`;
+
+  refs.lossCalculatorResult.innerHTML = `
+    <div class="loss-result-badge">Gana ${winnerLabel}</div>
+    <p class="loss-result-score">Saldo: <strong>${saldoLabel}</strong></p>
+    <p class="loss-result-detail">${detail}</p>
+  `;
+  refs.lossCalculatorResult.classList.remove("hidden");
+}
+
+function handleLossCalculatorSubmit(event) {
+  event.preventDefault();
+
+  const playerA = {
+    name: refs.lossPlayerAName.value.trim(),
+    balls: parseBallCount(refs.lossPlayerABalls.value),
+  };
+  const playerB = {
+    name: refs.lossPlayerBName.value.trim(),
+    balls: parseBallCount(refs.lossPlayerBBalls.value),
+  };
+
+  if (playerA.balls === null || playerB.balls === null) {
+    showToast("Las bolas restantes deben ser numeros enteros entre 0 y 7.", true);
+    return;
+  }
+
+  const loserKey = refs.lossLoserSelect.value === "B" ? "B" : "A";
+  const result = calculateLossOutcome({
+    loserKey,
+    players: {
+      A: playerA,
+      B: playerB,
+    },
+  });
+
+  renderLossCalculatorResult(result);
 }
 
 function setFormCollapsed(collapsed) {
@@ -2078,6 +2175,13 @@ async function handleImportFile(file) {
 }
 
 function bindUIEvents() {
+  refs.toggleLossCalculatorBtn.addEventListener("click", () => {
+    setLossCalculatorOpen(!state.lossCalculatorOpen);
+    if (state.lossCalculatorOpen) {
+      refs.lossCalculatorCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+
   refs.toggleFormBtn.addEventListener("click", () => {
     const formCard = document.querySelector(".form-card");
     setFormCollapsed(!formCard.classList.contains("collapsed"));
@@ -2124,6 +2228,12 @@ function bindUIEvents() {
     handleImportFile(file);
   });
 
+  refs.resetLossCalculatorBtn.addEventListener("click", () => {
+    resetLossCalculator();
+  });
+
+  refs.lossCalculatorForm.addEventListener("submit", handleLossCalculatorSubmit);
+
   refs.form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (!ensurePersistenceReady("guardar campeonatos")) {
@@ -2165,6 +2275,8 @@ async function init() {
   updateMutationControls();
   setFormCollapsed(false);
   resetForm();
+  resetLossCalculator();
+  setLossCalculatorOpen(false);
   renderAll();
 
   try {
