@@ -2368,12 +2368,15 @@ async function init() {
     if (shouldRenderData || shouldRenderBackups) {
       renderAll();
     } else {
+      renderChampionships();
       renderBackups();
     }
   } catch (error) {
     state.persistenceReady = true;
     updateMutationControls();
     updatePersistenceStatus("localStorage", "Usando localStorage");
+    renderChampionships();
+    renderBackups();
   }
 }
 
