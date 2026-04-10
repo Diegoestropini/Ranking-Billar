@@ -840,8 +840,17 @@ function validateAndBuildPayload() {
   }
 
   const rows = [...refs.resultsBody.querySelectorAll("tr")];
-  if (rows.length === 0) {
-    throw new Error("Debe haber al menos un jugador.");
+  const editingChampionship = state.editingChampionshipId
+    ? state.data.championships.find((championship) => championship.id === state.editingChampionshipId) || null
+    : null;
+  const originalPlayerCount = editingChampionship ? editingChampionship.results.length : 0;
+  const isLegacyChampionship = originalPlayerCount > 0 && originalPlayerCount < 8;
+
+  if (!isLegacyChampionship && rows.length < 8) {
+    throw new Error("Debe guardar como minimo 8 jugadores.");
+  }
+  if (isLegacyChampionship && rows.length < originalPlayerCount) {
+    throw new Error(`Este campeonato ya tenia ${originalPlayerCount} jugadores. No puede guardar con menos de esa cantidad.`);
   }
 
   const normalizedInChampionship = new Set();
