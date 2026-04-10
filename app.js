@@ -410,6 +410,22 @@ function createPlayerRecord(name) {
   };
 }
 
+function pruneUnusedPlayers(data) {
+  const usedPlayerIds = new Set();
+  data.championships.forEach((championship) => {
+    championship.results.forEach((result) => {
+      usedPlayerIds.add(result.playerId);
+    });
+  });
+  data.players = data.players.filter((player) => usedPlayerIds.has(player.id));
+}
+
+function normalizeSnapshotData(data) {
+  const normalized = cloneData(data);
+  pruneUnusedPlayers(normalized);
+  return normalized;
+}
+
 function buildResultsPayload(validatedRows) {
   const stagedPlayers = new Map();
   const playersToCreate = [];
@@ -492,6 +508,7 @@ async function updateChampionship(championshipId, payload) {
     item.date = payload.date;
     item.results = payload.results;
     item.updatedAt = new Date().toISOString();
+    pruneUnusedPlayers(draft);
     updated = item;
   });
   return updated;
@@ -505,6 +522,7 @@ async function deleteChampionship(championshipId) {
       return;
     }
     draft.championships.splice(idx, 1);
+    pruneUnusedPlayers(draft);
     deleted = true;
   });
   return deleted;
@@ -2179,7 +2197,7 @@ function renderBackups() {
       }
       try {
         await createBackup("Antes de restaurar", state.data);
-        await persistAndApplyData(cloneData(backup.data));
+        await persistAndApplyData(normalizeSnapshotData(backup.data));
         resetForm();
         renderAll();
         showToast("Backup restaurado.");
@@ -2258,7 +2276,7 @@ async function handleImportFile(file) {
     const text = await readFileAsText(file);
     const importedData = parseDataContainer(text);
     await createBackup("Antes de importar", state.data);
-    await persistAndApplyData(importedData);
+    await persistAndApplyData(normalizeSnapshotData(importedData));
     await createBackup(`Importado: ${file.name}`, state.data);
     resetForm();
     renderAll();
