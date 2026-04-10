@@ -379,6 +379,12 @@ async function createBackup(label, data = state.data) {
   return backup;
 }
 
+async function persistAndApplyData(nextData) {
+  const persistedData = await persistStateSnapshot(nextData);
+  state.data = persistedData;
+  return persistedData;
+}
+
 async function saveStore(data) {
   try {
     return await persistStateSnapshot(data);
@@ -539,6 +545,13 @@ function parseBallCount(value) {
     return null;
   }
   return num;
+}
+
+function getVeryLowPlacementStart(totalParticipants) {
+  if (totalParticipants <= 1) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return totalParticipants <= 4 ? totalParticipants : Math.max(2, totalParticipants - 1);
 }
 
 const MEDAL_ICONS = {
@@ -1029,11 +1042,11 @@ function getPerformanceLabel(position, totalParticipants) {
   if (position === 1) {
     return "Excelente";
   }
+  if (position >= getVeryLowPlacementStart(totalParticipants)) {
+    return "Muy insuficiente";
+  }
   if (position >= 2 && position <= 4) {
     return "Muy bueno";
-  }
-  if (position >= Math.max(2, totalParticipants - 1)) {
-    return "Muy insuficiente";
   }
   if (position >= 5 && position <= 8) {
     return "Bueno";
@@ -1048,11 +1061,11 @@ function getPerformanceTone(position, totalParticipants) {
   if (position === 1) {
     return "strong";
   }
+  if (position >= getVeryLowPlacementStart(totalParticipants)) {
+    return "very-low";
+  }
   if (position >= 2 && position <= 4) {
     return "strong";
-  }
-  if (position >= Math.max(2, totalParticipants - 1)) {
-    return "very-low";
   }
   if (position >= 5 && position <= 8) {
     return "mid";
@@ -2157,8 +2170,7 @@ function renderBackups() {
       }
       try {
         await createBackup("Antes de restaurar", state.data);
-        state.data = cloneData(backup.data);
-        await persistStateSnapshot(state.data);
+        await persistAndApplyData(cloneData(backup.data));
         resetForm();
         renderAll();
         showToast("Backup restaurado.");
@@ -2237,8 +2249,7 @@ async function handleImportFile(file) {
     const text = await readFileAsText(file);
     const importedData = parseDataContainer(text);
     await createBackup("Antes de importar", state.data);
-    state.data = importedData;
-    await persistStateSnapshot(state.data);
+    await persistAndApplyData(importedData);
     await createBackup(`Importado: ${file.name}`, state.data);
     resetForm();
     renderAll();
