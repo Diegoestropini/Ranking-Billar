@@ -2050,6 +2050,11 @@ input:focus {
   transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 
+#ranking-body tr.rank-top:nth-child(4) .player-name-btn.player-name-champion,
+#ranking-body tr.rank-dynamic .player-name-btn.player-name-champion {
+  color: var(--gold);
+}
+
 .player-name-btn:hover {
   color: #eaf7ff;
   text-decoration-color: rgba(186, 230, 250, 0.65);

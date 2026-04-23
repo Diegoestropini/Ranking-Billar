@@ -973,6 +973,9 @@ function renderRanking() {
     const playerBtn = document.createElement("button");
     playerBtn.type = "button";
     playerBtn.className = "player-name-btn";
+    if (idx > 2 && entry.championshipsWon > 0) {
+      playerBtn.classList.add("player-name-champion");
+    }
     playerBtn.textContent = entry.name;
     playerBtn.addEventListener("click", () => {
       const changedPlayer = state.selectedPlayerId !== entry.playerId;
