@@ -1230,7 +1230,10 @@ function updateMutationControls() {
   const disabled = !state.persistenceReady;
   refs.saveBtn.disabled = disabled;
   refs.backupBtn.disabled = disabled;
+  refs.exportBtn.disabled = disabled;
   refs.importInput.disabled = disabled;
+  refs.toggleNameEditorBtn.disabled = disabled;
+  refs.toggleMedalsBtn.disabled = disabled;
 }
 
 function getHistoricalComparisonMeta(delta) {
@@ -2082,7 +2085,11 @@ function renderChampionships() {
     editBtn.type = "button";
     editBtn.className = "btn btn-secondary";
     editBtn.textContent = "Editar";
+    editBtn.disabled = !state.persistenceReady;
     editBtn.addEventListener("click", () => {
+      if (!ensurePersistenceReady("editar campeonatos")) {
+        return;
+      }
       fillFormForEdit(championship);
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
@@ -2213,7 +2220,11 @@ function renderBackups() {
     exportBtn.type = "button";
     exportBtn.className = "btn btn-ghost btn-sm";
     exportBtn.textContent = "Exportar";
+    exportBtn.disabled = !state.persistenceReady;
     exportBtn.addEventListener("click", () => {
+      if (!ensurePersistenceReady("exportar backups")) {
+        return;
+      }
       downloadJsonFile(buildExportPayload(backup.data, `backup:${backup.label}`), `ranking-backup-${backup.id}.json`);
     });
 
@@ -2247,6 +2258,9 @@ async function handleCreateBackup() {
 }
 
 function handleExport() {
+  if (!ensurePersistenceReady("exportar datos")) {
+    return;
+  }
   try {
     const payload = buildExportPayload(state.data, "current-state");
     const datePart = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
@@ -2310,11 +2324,17 @@ function bindUIEvents() {
   });
 
   refs.toggleNameEditorBtn.addEventListener("click", () => {
+    if (!ensurePersistenceReady("editar nombres")) {
+      return;
+    }
     state.nameEditorOpen = !state.nameEditorOpen;
     renderNameEditor();
   });
 
   refs.toggleMedalsBtn.addEventListener("click", () => {
+    if (!ensurePersistenceReady("ver medallas")) {
+      return;
+    }
     state.medalsPanelOpen = !state.medalsPanelOpen;
     renderMedalsPanel();
   });
