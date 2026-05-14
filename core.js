@@ -117,6 +117,20 @@
     const raw = input && typeof input === "object" ? input : createEmptyData();
     const rawPlayers = Array.isArray(raw.players) ? raw.players : [];
     const players = rawPlayers.map(sanitizePlayer);
+    const seenPlayerIds = new Set();
+    const seenPlayerNames = new Set();
+    players.forEach((player, index) => {
+      if (seenPlayerIds.has(player.id)) {
+        throw new Error(`Jugador duplicado en posicion ${index + 1}: id repetido.`);
+      }
+      seenPlayerIds.add(player.id);
+
+      const normalized = normalizeName(player.name);
+      if (seenPlayerNames.has(normalized)) {
+        throw new Error(`Jugador duplicado en posicion ${index + 1}: nombre repetido.`);
+      }
+      seenPlayerNames.add(normalized);
+    });
     const playerIds = new Set(players.map((player) => player.id));
     const rawChampionships = Array.isArray(raw.championships) ? raw.championships : [];
     const championships = rawChampionships.map((championship, index) => sanitizeChampionship(championship, playerIds, index));

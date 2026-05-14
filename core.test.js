@@ -151,7 +151,7 @@ test("backup crea snapshot sanitizado sin depender de localStorage", () => {
   assert.deepEqual(backup.data.championships, []);
 });
 
-test("import invalido rechaza jugadores duplicados dentro del mismo campeonato", () => {
+test("import invalido rechaza jugadores repetidos dentro del mismo campeonato", () => {
   assert.throws(() => {
     core.parseDataContainer(
       JSON.stringify({
@@ -172,4 +172,32 @@ test("import invalido rechaza jugadores duplicados dentro del mismo campeonato",
       }),
     );
   }, /jugadores repetidos/i);
+});
+
+test("import invalido rechaza jugadores con ids duplicados", () => {
+  assert.throws(() => {
+    core.parseDataContainer(
+      JSON.stringify({
+        players: [
+          { id: "p1", name: "Ana", createdAt: "2026-01-01T00:00:00.000Z" },
+          { id: "p1", name: "Beto", createdAt: "2026-01-01T00:00:00.000Z" },
+        ],
+        championships: [],
+      }),
+    );
+  }, /id repetido/i);
+});
+
+test("import invalido rechaza jugadores con nombres duplicados normalizados", () => {
+  assert.throws(() => {
+    core.parseDataContainer(
+      JSON.stringify({
+        players: [
+          { id: "p1", name: "Ana Perez", createdAt: "2026-01-01T00:00:00.000Z" },
+          { id: "p2", name: " ana   perez ", createdAt: "2026-01-01T00:00:00.000Z" },
+        ],
+        championships: [],
+      }),
+    );
+  }, /nombre repetido/i);
 });

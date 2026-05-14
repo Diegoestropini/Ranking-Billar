@@ -273,9 +273,9 @@ function updatePersistenceStatus(mode, detail) {
 
 async function persistStateSnapshot(data) {
   const sanitized = sanitizeStore(data);
-  writeLegacyStore(sanitized);
 
   if (!canUseIndexedDb()) {
+    writeLegacyStore(sanitized);
     updatePersistenceStatus("localStorage", "Guardado en localStorage");
     return sanitized;
   }
@@ -286,7 +286,12 @@ async function persistStateSnapshot(data) {
     savedAt: new Date().toISOString(),
     data: sanitized,
   });
-  updatePersistenceStatus("mixed", "Guardado en IndexedDB + localStorage");
+  try {
+    writeLegacyStore(sanitized);
+    updatePersistenceStatus("mixed", "Guardado en IndexedDB + localStorage");
+  } catch (error) {
+    updatePersistenceStatus("indexeddb", "Guardado en IndexedDB");
+  }
   return sanitized;
 }
 
@@ -1122,20 +1127,22 @@ function getPlacementMedal(position) {
 function getPlayerTimeline(playerId) {
   const timeline = [];
   const playerLookup = buildPlayerLookup(state.data.players);
-  const championshipContexts = computeChampionshipContexts(state.data.championships, playerLookup);
-  const globalPerformanceStats = computeGlobalPerformanceStats(state.data.championships, championshipContexts);
-  const baselineScore = globalPerformanceStats.mean;
+  const sortedChampionships = sortChampionshipsAscending(state.data.championships);
   let championships = 0;
   let performanceTotal = 0;
   const performanceHistory = [];
   let previousRating = null;
 
-  sortChampionshipsAscending(state.data.championships).forEach((championship) => {
+  sortedChampionships.forEach((championship, index) => {
     const result = championship.results.find((row) => row.playerId === playerId);
     if (!result) {
       return;
     }
 
+    const championshipsToDate = sortedChampionships.slice(0, index + 1);
+    const championshipContexts = computeChampionshipContexts(championshipsToDate, playerLookup);
+    const globalPerformanceStats = computeGlobalPerformanceStats(championshipsToDate, championshipContexts);
+    const baselineScore = globalPerformanceStats.mean;
     championships += 1;
     const saldoRaw = Number(result.saldo) || 0;
     const context = championshipContexts.get(championship.id);
