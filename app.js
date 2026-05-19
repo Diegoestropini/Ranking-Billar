@@ -2298,7 +2298,7 @@ async function handleImportFile(file) {
 
   try {
     const text = await readFileAsText(file);
-    const importedData = parseDataContainer(text);
+    const importedData = parseDataContainer(text, { enforceMinimumParticipants: true });
     await createBackup("Antes de importar", state.data);
     await persistAndApplyData(normalizeSnapshotData(importedData));
     await createBackup(`Importado: ${file.name}`, state.data);

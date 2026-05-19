@@ -19,6 +19,7 @@
   const PERFORMANCE_RELATIVE_WEIGHT = 0.3;
   const PERFORMANCE_PLACEMENT_WEIGHT = 0.2;
   const CONSISTENCY_BONUS_MAX = 3;
+  const MIN_CHAMPIONSHIP_PARTICIPANTS = 8;
 
   function createId(prefix, now = Date.now()) {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -81,7 +82,7 @@
     };
   }
 
-  function sanitizeChampionship(championship, playerIds, index) {
+  function sanitizeChampionship(championship, playerIds, index, options = {}) {
     if (!championship || typeof championship !== "object") {
       throw new Error(`Campeonato invalido en posicion ${index + 1}.`);
     }
@@ -93,6 +94,10 @@
     }
 
     const rawResults = Array.isArray(championship.results) ? championship.results : [];
+    if (options.enforceMinimumParticipants && rawResults.length < MIN_CHAMPIONSHIP_PARTICIPANTS) {
+      throw new Error(`Campeonato "${name}" debe tener como minimo ${MIN_CHAMPIONSHIP_PARTICIPANTS} jugadores.`);
+    }
+
     const seenPlayers = new Set();
     const results = rawResults.map((result, resultIndex) => {
       const sanitized = sanitizeResult(result, playerIds, name, resultIndex);
@@ -113,7 +118,7 @@
     };
   }
 
-  function sanitizeStore(input) {
+  function sanitizeStore(input, options = {}) {
     const raw = input && typeof input === "object" ? input : createEmptyData();
     const rawPlayers = Array.isArray(raw.players) ? raw.players : [];
     const players = rawPlayers.map(sanitizePlayer);
@@ -133,16 +138,18 @@
     });
     const playerIds = new Set(players.map((player) => player.id));
     const rawChampionships = Array.isArray(raw.championships) ? raw.championships : [];
-    const championships = rawChampionships.map((championship, index) => sanitizeChampionship(championship, playerIds, index));
+    const championships = rawChampionships.map((championship, index) =>
+      sanitizeChampionship(championship, playerIds, index, options),
+    );
     return { players, championships };
   }
 
-  function parseDataContainer(rawText) {
+  function parseDataContainer(rawText, options = {}) {
     const parsed = JSON.parse(rawText);
     if (parsed && typeof parsed === "object" && parsed.data) {
-      return sanitizeStore(parsed.data);
+      return sanitizeStore(parsed.data, options);
     }
-    return sanitizeStore(parsed);
+    return sanitizeStore(parsed, options);
   }
 
   function capSaldoForRating(saldo) {

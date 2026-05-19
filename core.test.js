@@ -174,6 +174,27 @@ test("import invalido rechaza jugadores repetidos dentro del mismo campeonato", 
   }, /jugadores repetidos/i);
 });
 
+test("import invalido rechaza campeonatos con menos de 8 jugadores", () => {
+  assert.throws(() => {
+    core.parseDataContainer(
+      JSON.stringify({
+        players: [{ id: "p1", name: "Ana", createdAt: "2026-01-01T00:00:00.000Z" }],
+        championships: [
+          {
+            id: "c1",
+            name: "Apertura",
+            date: "2026-02-01",
+            createdAt: "2026-02-01T00:00:00.000Z",
+            updatedAt: "2026-02-01T00:00:00.000Z",
+            results: [{ playerId: "p1", points: 10, saldo: 1 }],
+          },
+        ],
+      }),
+      { enforceMinimumParticipants: true },
+    );
+  }, /minimo 8 jugadores/i);
+});
+
 test("import invalido rechaza jugadores con ids duplicados", () => {
   assert.throws(() => {
     core.parseDataContainer(
