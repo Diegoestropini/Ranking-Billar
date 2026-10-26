@@ -1,0 +1,25 @@
+name: Repository checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Verify privacy detector
+        run: node scripts/check-repository.cjs --self-test
+      - name: Check private files and source syntax
+        run: node scripts/check-repository.cjs
+      - name: Run regression tests
+        run: node core.test.js
